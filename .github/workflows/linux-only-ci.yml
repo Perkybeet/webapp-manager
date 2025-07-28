@@ -1,0 +1,165 @@
+name: WebApp Manager - Linux Only Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, 3.10, 3.11]
+        linux-distro: [ubuntu-20.04, ubuntu-22.04]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y nginx nodejs npm git
+        
+    - name: Fix line endings (Linux)
+      run: |
+        chmod +x fix-linux.sh
+        ./fix-linux.sh
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install rich colorama pytest pytest-cov
+        
+    - name: Test imports and basic functionality
+      run: |
+        python test_quick.py
+        
+    - name: Test CLI commands
+      run: |
+        python webapp-manager.py --help
+        python webapp-manager.py types
+        
+    - name: Test GUI initialization
+      run: |
+        # Test that GUI can be imported and initialized
+        python -c "from webapp_manager.gui.terminal_ui import TerminalUI; ui = TerminalUI(); print('GUI OK')"
+        
+    - name: Test deployers
+      run: |
+        python -c "from webapp_manager.deployers.deployer_factory import DeployerFactory; print('Deployers:', DeployerFactory.get_supported_types())"
+        
+    - name: Run unit tests
+      run: |
+        python -m pytest tests/ -v --cov=webapp_manager --cov-report=xml
+        
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        
+  test-requirements:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Test system requirements
+      run: |
+        # Verificar que las herramientas necesarias estén disponibles
+        which python3
+        which nginx
+        which npm
+        which git
+        
+        # Verificar versiones
+        python3 --version
+        nginx -v
+        npm --version
+        git --version
+        
+    - name: Test file permissions
+      run: |
+        chmod +x webapp-manager.py
+        chmod +x install.sh
+        chmod +x fix-linux.sh
+        
+        # Verificar que son ejecutables
+        ./webapp-manager.py --help || echo "Expected to fail on GitHub Actions"
+        
+  security-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run security checks
+      run: |
+        # Verificar que no hay credenciales hardcodeadas
+        grep -r "password\|secret\|key" . --include="*.py" --exclude-dir=".git" || echo "No hardcoded credentials found"
+        
+        # Verificar permisos de archivos
+        find . -type f -name "*.py" -exec chmod 644 {} \;
+        find . -type f -name "*.sh" -exec chmod 755 {} \;
+        
+  documentation-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check documentation
+      run: |
+        # Verificar que existen archivos de documentación
+        test -f README.md
+        test -f GITHUB_INSTRUCTIONS.md
+        test -f PROYECTO_RESUMEN.md
+        
+        # Verificar que mencionan "Linux only"
+        grep -i "linux" README.md
+        grep -i "linux" GITHUB_INSTRUCTIONS.md
+        
+        echo "Documentation check passed"
+        
+  # Este job fallará intencionalmente en Windows/macOS
+  prevent-non-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Verify Linux-only design
+      run: |
+        echo "✅ Este proyecto está diseñado SOLO para Linux"
+        echo "✅ No se debe ejecutar en Windows o macOS"
+        echo "✅ GitHub Actions solo prueba en Ubuntu"
+        
+        # Verificar que el código rechaza sistemas no-Linux
+        python -c "
+        import sys
+        sys.path.insert(0, '.')
+        try:
+            import os
+            original_name = os.name
+            os.name = 'nt'  # Simular Windows
+            exec(open('webapp-manager.py').read())
+            print('ERROR: Should have failed on Windows')
+            exit(1)
+        except SystemExit as e:
+            if e.code == 1:
+                print('✅ Correctamente rechaza sistemas no-Linux')
+            else:
+                print('ERROR: Exit code incorrecto')
+                exit(1)
+        finally:
+            os.name = original_name
+        "

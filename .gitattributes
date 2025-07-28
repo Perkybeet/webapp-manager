@@ -1,0 +1,58 @@
+# Git attributes para WebApp Manager - Solo Linux
+
+# Asegurar terminadores de línea Unix (LF) para todos los archivos
+* text=auto eol=lf
+
+# Archivos Python
+*.py text eol=lf
+*.pyx text eol=lf
+*.pyi text eol=lf
+
+# Scripts de shell
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Archivos de configuración
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+
+# Archivos de documentación
+*.md text eol=lf
+*.rst text eol=lf
+*.txt text eol=lf
+
+# Archivos de requirements
+requirements*.txt text eol=lf
+Pipfile text eol=lf
+Pipfile.lock text eol=lf
+
+# Configuración de servicios Linux
+*.service text eol=lf
+*.conf text eol=lf
+
+# Archivos ejecutables deben mantener LF
+webapp-manager.py text eol=lf
+install.sh text eol=lf
+fix-linux.sh text eol=lf
+
+# Archivos binarios
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+
+# Archivos que no deben tener terminadores de línea procesados
+*.pyc binary
+*.pyo binary
+*.pyd binary
+*.so binary
+*.egg binary
+*.whl binary

@@ -1,0 +1,280 @@
+# Makefile for WebApp Manager
+
+# Variables
+PYTHON := python3
+PIP := pip3
+VENV := venv
+VENV_BIN := $(VENV)/bin
+PYTHON_VENV := $(VENV_BIN)/python
+PIP_VENV := $(VENV_BIN)/pip
+PACKAGE_NAME := webapp_manager
+TESTS_DIR := tests
+DOCS_DIR := docs
+
+# Colors for output
+RED := \033[0;31m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+BLUE := \033[0;34m
+NC := \033[0m # No Color
+
+# Default target
+.PHONY: help
+help:
+	@echo "$(BLUE)WebApp Manager - Makefile$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Available targets:$(NC)"
+	@echo "  $(GREEN)help$(NC)              - Show this help message"
+	@echo "  $(GREEN)install$(NC)           - Install the package in development mode"
+	@echo "  $(GREEN)install-dev$(NC)       - Install development dependencies"
+	@echo "  $(GREEN)venv$(NC)              - Create virtual environment"
+	@echo "  $(GREEN)clean$(NC)             - Clean build artifacts"
+	@echo "  $(GREEN)test$(NC)              - Run tests"
+	@echo "  $(GREEN)test-coverage$(NC)     - Run tests with coverage"
+	@echo "  $(GREEN)lint$(NC)              - Run linting checks"
+	@echo "  $(GREEN)format$(NC)            - Format code with black"
+	@echo "  $(GREEN)build$(NC)             - Build distribution packages"
+	@echo "  $(GREEN)docs$(NC)              - Generate documentation"
+	@echo "  $(GREEN)serve-docs$(NC)        - Serve documentation locally"
+	@echo "  $(GREEN)check$(NC)             - Run all checks (lint, test, format)"
+	@echo "  $(GREEN)dev-setup$(NC)         - Complete development setup"
+	@echo "  $(GREEN)uninstall$(NC)         - Uninstall the package"
+	@echo "  $(GREEN)install-system-deps$(NC) - Install system dependencies"
+	@echo "  $(GREEN)fix-nodejs$(NC)        - Fix Node.js conflicts"
+	@echo "  $(GREEN)fix-line-endings$(NC)  - Fix Windows line endings"
+	@echo "  $(GREEN)install-complete$(NC)  - Complete installation (recommended)"
+	@echo "  $(GREEN)install-with-pip$(NC)  - Install with pip override"
+	@echo "  $(GREEN)install-global$(NC)    - Install webapp-manager globally"
+	@echo "  $(GREEN)run$(NC)               - Run locally without installation"
+	@echo "  $(GREEN)create-alias$(NC)      - Create local alias"
+	@echo "  $(GREEN)uninstall-global$(NC)  - Remove global installation"
+	@echo ""
+
+# Create virtual environment
+.PHONY: venv
+venv:
+	@echo "$(BLUE)Creating virtual environment...$(NC)"
+	$(PYTHON) -m venv $(VENV)
+	$(PIP_VENV) install --upgrade pip setuptools wheel
+	@echo "$(GREEN)Virtual environment created successfully!$(NC)"
+	@echo "$(YELLOW)Activate with: source $(VENV)/bin/activate$(NC)"
+
+# Install package in development mode
+.PHONY: install
+install:
+	@echo "$(BLUE)Installing package in development mode...$(NC)"
+	$(PIP) install -e .
+	@echo "$(GREEN)Package installed successfully!$(NC)"
+
+# Install development dependencies
+.PHONY: install-dev
+install-dev:
+	@echo "$(BLUE)Installing development dependencies...$(NC)"
+	$(PIP) install -e .[dev]
+	@echo "$(GREEN)Development dependencies installed successfully!$(NC)"
+
+# Clean build artifacts
+.PHONY: clean
+clean:
+	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
+	rm -rf build/
+	rm -rf dist/
+	rm -rf *.egg-info/
+	rm -rf .pytest_cache/
+	rm -rf .coverage
+	rm -rf htmlcov/
+	rm -rf .mypy_cache/
+	rm -rf .tox/
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
+	@echo "$(GREEN)Clean completed!$(NC)"
+
+# Run tests
+.PHONY: test
+test:
+	@echo "$(BLUE)Running tests...$(NC)"
+	$(PYTHON) -m pytest $(TESTS_DIR) -v
+	@echo "$(GREEN)Tests completed!$(NC)"
+
+# Run tests with coverage
+.PHONY: test-coverage
+test-coverage:
+	@echo "$(BLUE)Running tests with coverage...$(NC)"
+	$(PYTHON) -m pytest $(TESTS_DIR) --cov=$(PACKAGE_NAME) --cov-report=html --cov-report=term-missing
+	@echo "$(GREEN)Coverage report generated in htmlcov/$(NC)"
+
+# Run linting checks
+.PHONY: lint
+lint:
+	@echo "$(BLUE)Running linting checks...$(NC)"
+	$(PYTHON) -m flake8 $(PACKAGE_NAME) $(TESTS_DIR) --count --select=E9,F63,F7,F82 --show-source --statistics
+	$(PYTHON) -m flake8 $(PACKAGE_NAME) $(TESTS_DIR) --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+	@echo "$(GREEN)Linting completed!$(NC)"
+
+# Format code with black
+.PHONY: format
+format:
+	@echo "$(BLUE)Formatting code with black...$(NC)"
+	$(PYTHON) -m black $(PACKAGE_NAME) $(TESTS_DIR)
+	@echo "$(GREEN)Code formatted successfully!$(NC)"
+
+# Build distribution packages
+.PHONY: build
+build: clean
+	@echo "$(BLUE)Building distribution packages...$(NC)"
+	$(PYTHON) setup.py sdist bdist_wheel
+	@echo "$(GREEN)Build completed! Check dist/ directory$(NC)"
+
+# Generate documentation
+.PHONY: docs
+docs:
+	@echo "$(BLUE)Generating documentation...$(NC)"
+	mkdir -p $(DOCS_DIR)
+	@echo "# WebApp Manager Documentation" > $(DOCS_DIR)/README.md
+	@echo "Version: 3.0.0" >> $(DOCS_DIR)/README.md
+	@echo "## Package Structure" >> $(DOCS_DIR)/README.md
+	@echo "- webapp_manager.core.manager - Main manager class" >> $(DOCS_DIR)/README.md
+	@echo "- webapp_manager.services - Service modules" >> $(DOCS_DIR)/README.md
+	@echo "- webapp_manager.cli - Command line interface" >> $(DOCS_DIR)/README.md
+	@echo "- webapp_manager.utils - Utility functions" >> $(DOCS_DIR)/README.md
+	@echo "- webapp_manager.models - Data models" >> $(DOCS_DIR)/README.md
+	@echo "- webapp_manager.config - Configuration management" >> $(DOCS_DIR)/README.md
+	@echo "$(GREEN)Documentation generated in $(DOCS_DIR)/$(NC)"
+
+# Serve documentation locally
+.PHONY: serve-docs
+serve-docs:
+	@echo "$(BLUE)Serving documentation locally...$(NC)"
+	cd $(DOCS_DIR) && $(PYTHON) -m http.server 8000
+	@echo "$(YELLOW)Documentation available at http://localhost:8000$(NC)"
+
+# Run all checks
+.PHONY: check
+check: lint test format
+	@echo "$(GREEN)All checks passed!$(NC)"
+
+# Complete development setup
+.PHONY: dev-setup
+dev-setup: venv install-dev
+	@echo "$(GREEN)Development setup completed!$(NC)"
+	@echo "$(YELLOW)Don't forget to activate your virtual environment:$(NC)"
+	@echo "  source $(VENV)/bin/activate"
+
+# Uninstall package
+.PHONY: uninstall
+uninstall:
+	@echo "$(BLUE)Uninstalling package...$(NC)"
+	$(PIP) uninstall -y $(PACKAGE_NAME)
+	@echo "$(GREEN)Package uninstalled successfully!$(NC)"
+
+# Install system dependencies (Ubuntu/Debian)
+.PHONY: install-system-deps
+install-system-deps:
+	@echo "$(BLUE)Installing system dependencies...$(NC)"
+	sudo apt-get update
+	@echo "$(BLUE)Installing Python and nginx...$(NC)"
+	sudo apt-get install -y python3 python3-pip python3-venv nginx python3-dialog
+	@echo "$(BLUE)Installing Node.js and npm...$(NC)"
+	@if command -v node >/dev/null 2>&1; then \
+		echo "$(GREEN)Node.js already installed: $$(node --version)$(NC)"; \
+	else \
+		curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && \
+		sudo apt-get install -y nodejs; \
+	fi
+	@echo "$(GREEN)System dependencies installed!$(NC)"
+
+# Fix Node.js conflicts
+.PHONY: fix-nodejs
+fix-nodejs:
+	@echo "$(BLUE)Fixing Node.js conflicts...$(NC)"
+	@echo "$(YELLOW)Removing conflicting packages...$(NC)"
+	sudo apt-get remove -y nodejs npm
+	sudo apt-get autoremove -y
+	@echo "$(BLUE)Installing Node.js from NodeSource...$(NC)"
+	curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+	sudo apt-get install -y nodejs
+	@echo "$(GREEN)Node.js conflicts resolved!$(NC)"
+	@echo "$(GREEN)Node.js version: $$(node --version)$(NC)"
+	@echo "$(GREEN)npm version: $$(npm --version)$(NC)"
+
+# Fix line endings (Windows to Unix)
+.PHONY: fix-line-endings
+fix-line-endings:
+	@echo "$(BLUE)Fixing line endings...$(NC)"
+	sed -i 's/\r$$//' webapp-manager.py
+	find webapp_manager/ -name "*.py" -exec sed -i 's/\r$$//' {} \;
+	@echo "$(GREEN)Line endings fixed!$(NC)"
+
+# Check if running as root (for system operations)
+.PHONY: check-root
+check-root:
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "$(RED)This operation requires root privileges$(NC)"; \
+		exit 1; \
+	fi
+
+# Complete installation (recommended)
+.PHONY: install-complete
+install-complete: fix-line-endings install-global
+	@echo "$(BLUE)Complete WebApp Manager installation...$(NC)"
+	@echo "$(BLUE)Verifying installation...$(NC)"
+	webapp-manager --help || echo "$(YELLOW)Installation completed but command may need path adjustment$(NC)"
+	@echo "$(GREEN)Installation completed successfully!$(NC)"
+	@echo "$(YELLOW)Usage: webapp-manager --help$(NC)"
+
+# Alternative installation with pip override
+.PHONY: install-with-pip
+install-with-pip: fix-line-endings
+	@echo "$(BLUE)Installing with pip override...$(NC)"
+	pip3 install -e . --break-system-packages
+	sudo $(MAKE) install-global
+	webapp-manager --help || echo "$(YELLOW)Installation completed but command may need path adjustment$(NC)"
+	@echo "$(GREEN)Installation with pip completed!$(NC)"
+
+# Run locally without installation
+.PHONY: run
+run:
+	@echo "$(BLUE)Running webapp-manager locally...$(NC)"
+	python3 webapp-manager.py $(ARGS)
+
+# Create local alias for easy usage
+.PHONY: create-alias
+create-alias:
+	@echo "$(BLUE)Creating local alias...$(NC)"
+	@echo "alias webapp-manager='cd $(PWD) && python3 webapp-manager.py'" >> ~/.bashrc
+	@echo "$(GREEN)Alias created! Run 'source ~/.bashrc' to activate$(NC)"
+	@echo "$(YELLOW)Usage: webapp-manager --help$(NC)"
+
+# Install webapp-manager globally
+.PHONY: install-global
+install-global: check-root
+	@echo "$(BLUE)Installing webapp-manager globally...$(NC)"
+	@echo "$(BLUE)Creating installation directory...$(NC)"
+	sudo mkdir -p /opt/webapp-manager
+	sudo cp -r webapp_manager/ /opt/webapp-manager/
+	sudo cp webapp-manager.py /opt/webapp-manager/
+	sudo cp setup.py /opt/webapp-manager/ 2>/dev/null || true
+	@echo "$(BLUE)Creating global executable...$(NC)"
+	@echo '#!/bin/bash' | sudo tee /usr/local/bin/webapp-manager > /dev/null
+	@echo 'cd /opt/webapp-manager' | sudo tee -a /usr/local/bin/webapp-manager > /dev/null
+	@echo 'python3 webapp-manager.py "$$@"' | sudo tee -a /usr/local/bin/webapp-manager > /dev/null
+	sudo chmod +x /usr/local/bin/webapp-manager
+	@echo "$(GREEN)webapp-manager installed globally!$(NC)"
+
+# Remove global installation
+.PHONY: uninstall-global
+uninstall-global: check-root
+	@echo "$(BLUE)Removing global installation...$(NC)"
+	rm -f /usr/local/bin/webapp-manager
+	@echo "$(GREEN)Global installation removed!$(NC)"
+
+# Development workflow
+.PHONY: dev
+dev: format lint test
+	@echo "$(GREEN)Development workflow completed!$(NC)"
+
+# CI/CD pipeline simulation
+.PHONY: ci
+ci: clean install-dev lint test-coverage build
+	@echo "$(GREEN)CI pipeline completed successfully!$(NC)"
