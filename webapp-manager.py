@@ -8,30 +8,22 @@ Optimizado para servidores Linux con interfaz gráfica terminal
 import sys
 import os
 
-# Verificar que estamos en Linux
-if os.name != 'posix':
-    print("❌ Error: WebApp Manager está diseñado solo para sistemas Linux")
-    print("   Por favor, ejecuta esta aplicación en un servidor Linux")
-    sys.exit(1)
-
-# Agregar el directorio actual al path para importar el módulo
+# Agregar el directorio actual al path para imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from webapp_manager.cli import CLI
 
-
 def main():
-    """Función principal - Sistema modular para Linux"""
+    """Punto de entrada principal"""
     try:
         cli = CLI()
         cli.run()
     except KeyboardInterrupt:
-        print("\n\n🔴 Operación cancelada por el usuario")
+        print("\n👋 ¡Hasta luego!")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Error fatal: {e}")
+        print(f"❌ Error fatal: {e}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

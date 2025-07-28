@@ -475,59 +475,103 @@ class WebAppManager:
             return []
 
     def list_apps_console(self, detailed: bool = False):
-        """Listar aplicaciones en consola - versión original"""
-        print(Colors.header("Aplicaciones Instaladas"))
-
+        """Listar aplicaciones en consola - versión mejorada con Rich"""
+        from rich.table import Table
+        from rich.panel import Panel
+        
         try:
             apps = self.config_manager.get_all_apps()
             if not apps:
-                print(Colors.info("No hay aplicaciones instaladas"))
+                self.console.print(Panel(
+                    "[yellow]No hay aplicaciones instaladas[/yellow]\n\n"
+                    "Para desplegar tu primera aplicación:\n"
+                    "[cyan]webapp-manager add --domain ejemplo.com --source /ruta --port 3000[/cyan]",
+                    title="Sin Aplicaciones",
+                    border_style="yellow"
+                ))
                 return
+
+            # Crear tabla moderna
+            table = Table(title=f"📱 Aplicaciones Instaladas ({len(apps)})")
+            
+            table.add_column("🌐 Dominio", style="cyan", width=25)
+            table.add_column("📱 Tipo", style="magenta", width=12)
+            table.add_column("🚪 Puerto", style="yellow", width=8)
+            table.add_column("⚡ Estado", style="white", width=15)
+            table.add_column("🔒 SSL", style="blue", width=6)
+            
+            if detailed:
+                table.add_column("📅 Creado", style="dim", width=12)
+                table.add_column("📂 Fuente", style="dim", width=30)
 
             for i, (domain, app_config) in enumerate(apps.items(), 1):
                 try:
                     status = self.systemd_service.get_service_status(domain)
-                    ssl_status = "🔒 SSL" if app_config.ssl else "🔓 No SSL"
+                    
+                    # Determinar color y icono del estado
+                    if "Activo" in status:
+                        status_display = "[green]🟢 Activo[/green]"
+                    elif "Inactivo" in status:
+                        status_display = "[yellow]🟡 Inactivo[/yellow]"
+                    elif "Fallido" in status:
+                        status_display = "[red]🔴 Fallido[/red]"
+                    else:
+                        status_display = "[dim]🔘 Desconocido[/dim]"
 
-                    print(f"\n{Colors.bold(f'{i}. {domain}')}")
-                    print(f"   {Colors.CYAN}Estado:{Colors.END} {status}")
-                    print(f"   {Colors.CYAN}Puerto:{Colors.END} {app_config.port}")
-                    print(f"   {Colors.CYAN}Tipo:{Colors.END} {app_config.app_type}")
-                    print(f"   {Colors.CYAN}Seguridad:{Colors.END} {ssl_status}")
+                    ssl_icon = "✅" if app_config.ssl else "❌"
+
+                    row_data = [
+                        domain,
+                        app_config.app_type,
+                        str(app_config.port),
+                        status_display,
+                        ssl_icon
+                    ]
 
                     if detailed:
-                        print(f"   {Colors.CYAN}Fuente:{Colors.END} {app_config.source}")
-                        print(f"   {Colors.CYAN}Rama:{Colors.END} {app_config.branch}")
-                        print(f"   {Colors.CYAN}Creado:{Colors.END} {app_config.created}")
-                        print(f"   {Colors.CYAN}Actualizado:{Colors.END} {app_config.last_updated}")
+                        row_data.extend([
+                            app_config.created[:10] if app_config.created else "N/A",
+                            app_config.source[:30] + "..." if len(app_config.source) > 30 else app_config.source
+                        ])
 
-                        # Información adicional de sistema
-                        connectivity = self.app_service.test_connectivity(domain, app_config.port)
-                        conn_status = "🟢 Activo" if connectivity else "🔴 No responde"
-                        print(f"   {Colors.CYAN}Conectividad:{Colors.END} {conn_status}")
-                        
+                    table.add_row(*row_data)
+
                 except Exception as e:
-                    print(f"   {Colors.error(f'Error al procesar aplicación {domain}: {e}')}")
+                    # Mostrar fila de error
+                    error_row = [
+                        domain,
+                        "Error",
+                        "N/A", 
+                        "[red]🔴 Error[/red]",
+                        "❌"
+                    ]
+                    if detailed:
+                        error_row.extend(["Error", "Error"])
+                    
+                    table.add_row(*error_row)
                     continue
+
+            self.console.print(table)
+            
+            # Estadísticas
+            active_count = sum(1 for domain, _ in apps.items() 
+                            if "Activo" in self.systemd_service.get_service_status(domain))
+            ssl_count = sum(1 for _, app in apps.items() if app.ssl)
+            
+            stats_panel = Panel(
+                f"[bold]📊 Resumen:[/bold]\n"
+                f"• Total: {len(apps)} aplicaciones\n"
+                f"• Activas: [green]{active_count}[/green]\n"
+                f"• Con SSL: [blue]{ssl_count}[/blue]\n"
+                f"• Rate: [cyan]{active_count/len(apps)*100:.1f}%[/cyan]",
+                title="Estadísticas",
+                border_style="green"
+            )
+            self.console.print(stats_panel)
                     
         except Exception as e:
-            print(Colors.error(f"Error inesperado: {e}"))
+            self.console.print(f"[bold red]❌ Error al listar aplicaciones: {e}[/bold red]")
             logger.error(f"Error al listar aplicaciones: {e}")
-            
-            # Información adicional de debug
-            print(Colors.info("Información de debug:"))
-            print(f"   - Archivo de configuración: {self.config_manager.config_file}")
-            print(f"   - Archivo existe: {self.config_manager.config_file.exists()}")
-            if self.config_manager.config_file.exists():
-                print(f"   - Tamaño del archivo: {self.config_manager.config_file.stat().st_size} bytes")
-                
-                # Intentar leer el archivo raw
-                try:
-                    with open(self.config_manager.config_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        print(f"   - Contenido del archivo: {content[:200]}...")
-                except Exception as read_error:
-                    print(f"   - Error al leer archivo: {read_error}")
     
     def logs(self, domain: str, lines: int = 50, follow: bool = False) -> bool:
         """Mostrar logs de aplicación"""
