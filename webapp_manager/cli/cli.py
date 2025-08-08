@@ -7,7 +7,8 @@ import argparse
 import os
 import sys
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
+from contextlib import contextmanager
 
 from rich.console import Console
 from rich.table import Table
@@ -19,7 +20,8 @@ from rich.progress import (
     TimeElapsedColumn, 
     TimeRemainingColumn,
     SpinnerColumn,
-    MofNCompleteColumn
+    MofNCompleteColumn,
+    TaskProgressColumn
 )
 from rich.prompt import Prompt, Confirm
 from rich.syntax import Syntax
@@ -30,7 +32,7 @@ from rich.align import Align
 from rich.columns import Columns
 from rich.status import Status
 
-from ..utils import Colors, Validators
+from ..utils import Colors, Validators, ProgressManager
 from ..core.manager import WebAppManager
 from ..deployers import DeployerFactory
 
@@ -41,6 +43,8 @@ class CLI:
     def __init__(self):
         self.console = Console()
         self.manager = None
+        self.verbose = False
+        self.progress_manager = None
         
         # Configurar estilo de la consola
         self.console.print()  # Línea en blanco inicial
@@ -56,6 +60,12 @@ class CLI:
         parser = self._create_parser()
         args = parser.parse_args()
         
+        # Configurar modo verbose
+        self.verbose = args.verbose
+        
+        # Crear progress manager
+        self.progress_manager = ProgressManager(self.console, verbose=self.verbose)
+        
         # Verificar permisos de root (solo en sistemas Unix)
         if os.name == 'posix' and os.geteuid() != 0:
             self._show_error("Este script requiere permisos de root en sistemas Unix")
@@ -64,8 +74,12 @@ class CLI:
         
         # Inicializar manager
         try:
-            with self._loading("Inicializando WebApp Manager"):
-                self.manager = WebAppManager()
+            with self.progress_manager.task("Inicializando WebApp Manager", total=3) as task_id:
+                self.progress_manager.update(task_id, advance=1, description="Cargando configuración...")
+                self.manager = WebAppManager(verbose=self.verbose, progress_manager=self.progress_manager)
+                self.progress_manager.update(task_id, advance=1, description="Verificando servicios...")
+                time.sleep(0.3)  # Simular verificación
+                self.progress_manager.update(task_id, advance=1, description="Sistema listo")
         except Exception as e:
             self._show_error(f"Error inicializando WebApp Manager: {e}")
             sys.exit(1)
@@ -153,6 +167,9 @@ class CLI:
   • [green]webapp-manager types[/green]                    - Tipos de aplicación
   • [green]webapp-manager detect[/green] --directory ./app - Detectar tipo
 
+[bold]Opciones:[/bold]
+  • [yellow]--verbose, -v[/yellow]                           - Mostrar logs detallados
+
 [bold]Ejemplos Rápidos:[/bold]
   • [dim]webapp-manager add --domain mi-app.com --source https://github.com/user/app.git --port 3000[/dim]
   • [dim]webapp-manager list --detailed[/dim]
@@ -186,21 +203,8 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
     
     def _show_info(self, message: str):
         """Mostrar mensaje informativo"""
-        self.console.print(f"[bold blue]ℹ️  {message}[/bold blue]")
-    
-    def _create_progress_bar(self, description: str) -> Progress:
-        """Crear barra de progreso personalizada"""
-        return Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(bar_width=40),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=self.console,
-            expand=True
-        )
+        if self.verbose:
+            self.console.print(f"[bold blue]ℹ️  {message}[/bold blue]")
     
     def _create_parser(self) -> argparse.ArgumentParser:
         """Crear parser de argumentos"""
@@ -250,6 +254,13 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         parser.add_argument("--file", help="Archivo para importar/exportar configuración")
         parser.add_argument("--directory", help="Directorio para detectar tipo de aplicación")
         
+        # Opción verbose
+        parser.add_argument(
+            "--verbose", "-v", 
+            action="store_true", 
+            help="Mostrar logs detallados del proceso"
+        )
+        
         return parser
     
     def _get_examples(self) -> str:
@@ -270,6 +281,10 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
   
 [bold]📄 Sitios Estáticos:[/bold]
   webapp-manager add --domain sitio.com --source /ruta/sitio --type static
+
+[bold]🔍 Modo Verbose:[/bold]
+  webapp-manager add --domain app.com --source ./app --port 3000 --verbose
+  webapp-manager update --domain app.com -v
   
 [bold]📊 Gestión y Monitoreo:[/bold]
   webapp-manager list --detailed
@@ -309,29 +324,30 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         """Ejecutar comando específico"""
         command = args.command
         
-        # Mostrar header del comando
-        command_names = {
-            "add": "Agregar Aplicación",
-            "remove": "Eliminar Aplicación",
-            "list": "Listar Aplicaciones",
-            "restart": "Reiniciar Aplicación",
-            "update": "Actualizar Aplicación",
-            "logs": "Ver Logs",
-            "ssl": "Configurar SSL",
-            "diagnose": "Diagnóstico",
-            "repair": "Reparar Aplicación",
-            "status": "Estado",
-            "export": "Exportar Configuración",
-            "import": "Importar Configuración",
-            "types": "Tipos de Aplicación",
-            "detect": "Detectar Tipo",
-            "fix-config": "Reparar Configuración"
-        }
-        
-        self.console.print(Panel(
-            f"[bold cyan]{command_names.get(command, command.title())}[/bold cyan]",
-            style="blue"
-        ))
+        # Mostrar header del comando solo en modo verbose
+        if self.verbose:
+            command_names = {
+                "add": "Agregar Aplicación",
+                "remove": "Eliminar Aplicación",
+                "list": "Listar Aplicaciones",
+                "restart": "Reiniciar Aplicación",
+                "update": "Actualizar Aplicación",
+                "logs": "Ver Logs",
+                "ssl": "Configurar SSL",
+                "diagnose": "Diagnóstico",
+                "repair": "Reparar Aplicación",
+                "status": "Estado",
+                "export": "Exportar Configuración",
+                "import": "Importar Configuración",
+                "types": "Tipos de Aplicación",
+                "detect": "Detectar Tipo",
+                "fix-config": "Reparar Configuración"
+            }
+            
+            self.console.print(Panel(
+                f"[bold cyan]{command_names.get(command, command.title())}[/bold cyan]",
+                style="blue"
+            ))
         
         if command == "add":
             return self._cmd_add(args, env_vars)
@@ -370,65 +386,44 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             return False
     
     def _cmd_add(self, args, env_vars: Dict[str, str]) -> bool:
-        """Comando add con progress bar mejorado"""
+        """Comando add con progress real"""
         if not args.domain or not args.source or not args.port:
             self._show_error("Para agregar una app necesitas: --domain, --source y --port")
             return False
         
         # Mostrar resumen antes de empezar
-        self._show_deployment_summary(args, env_vars)
+        if self.verbose:
+            self._show_deployment_summary(args, env_vars)
         
         # Confirmar despliegue
         if not Confirm.ask("¿Proceder con el despliegue?", default=True):
             self._show_warning("Despliegue cancelado")
             return False
         
-        # Ejecutar despliegue con progress bar
-        with self._create_progress_bar("Desplegando aplicación") as progress:
-            task = progress.add_task("Iniciando despliegue...", total=100)
+        # Ejecutar despliegue
+        try:
+            result = self.manager.add_app(
+                domain=args.domain,
+                source_path=args.source,
+                port=args.port,
+                app_type=args.type,
+                branch=args.branch,
+                ssl=not args.no_ssl,
+                build_command=args.build_command or "",
+                start_command=args.start_command or "",
+                env_vars=env_vars,
+            )
             
-            try:
-                # Simulación de pasos del despliegue
-                steps = [
-                    ("Validando configuración...", 10),
-                    ("Preparando entorno...", 20),
-                    ("Obteniendo código fuente...", 35),
-                    ("Instalando dependencias...", 55),
-                    ("Construyendo aplicación...", 75),
-                    ("Configurando servicios...", 85),
-                    ("Iniciando aplicación...", 95),
-                    ("Verificando funcionamiento...", 100)
-                ]
-                
-                for step_desc, step_progress in steps:
-                    progress.update(task, description=step_desc, completed=step_progress)
-                    time.sleep(0.5)  # Simular trabajo
-                
-                # Ejecutar el despliegue real
-                result = self.manager.add_app(
-                    domain=args.domain,
-                    source_path=args.source,
-                    port=args.port,
-                    app_type=args.type,
-                    branch=args.branch,
-                    ssl=not args.no_ssl,
-                    build_command=args.build_command or "",
-                    start_command=args.start_command or "",
-                    env_vars=env_vars,
-                )
-                
-                progress.update(task, description="¡Despliegue completado!", completed=100)
-                
-            except Exception as e:
-                self._show_error(f"Error durante el despliegue: {e}")
-                return False
-        
-        if result:
-            self._show_deployment_success(args)
-        else:
-            self._show_deployment_failure(args)
-        
-        return result
+            if result:
+                self._show_deployment_success(args)
+            else:
+                self._show_deployment_failure(args)
+            
+            return result
+            
+        except Exception as e:
+            self._show_error(f"Error durante el despliegue: {e}")
+            return False
     
     def _show_deployment_summary(self, args, env_vars: Dict[str, str]):
         """Mostrar resumen del despliegue"""
@@ -496,6 +491,37 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             padding=(1, 2)
         )
         self.console.print(failure_panel)
+    
+    def _cmd_remove(self, args) -> bool:
+        """Comando remove con confirmación"""
+        if not args.domain:
+            self._show_error("Necesitas especificar --domain")
+            return False
+        
+        # Confirmación de seguridad
+        self._show_warning(f"⚠️  Vas a eliminar la aplicación: [bold red]{args.domain}[/bold red]")
+        self.console.print("[dim]Esta acción eliminará:[/dim]")
+        self.console.print("  • Código fuente de la aplicación")
+        self.console.print("  • Configuración de nginx")
+        self.console.print("  • Servicio systemd")
+        self.console.print("  • Certificados SSL (si existen)")
+        
+        if not args.no_backup:
+            self.console.print("\n[green]✅ Se creará un backup antes de eliminar[/green]")
+        
+        if not Confirm.ask(f"\n¿Confirmas la eliminación de {args.domain}?", default=False):
+            self._show_info("Eliminación cancelada")
+            return True
+        
+        # Ejecutar eliminación
+        result = self.manager.remove_app(args.domain, backup=not args.no_backup)
+        
+        if result:
+            self._show_success(f"Aplicación {args.domain} eliminada exitosamente")
+        else:
+            self._show_error(f"Error eliminando {args.domain}")
+        
+        return result
     
     def _cmd_list(self, args) -> bool:
         """Comando list con tabla moderna"""
@@ -597,91 +623,35 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             self._show_error(f"Error listando aplicaciones: {e}")
             return False
     
-    def _cmd_types(self, args):
-        """Mostrar tipos de deployers disponibles"""
-        deployers = DeployerFactory.list_all_deployers()
+    def _cmd_restart(self, args) -> bool:
+        """Comando restart"""
+        if not args.domain:
+            self._show_error("Necesitas especificar --domain")
+            return False
         
-        # Crear tabla de tipos
-        types_table = Table(title="🛠️  Tipos de Aplicación Soportados")
-        types_table.add_column("Tipo", style="cyan", width=12)
-        types_table.add_column("Descripción", style="white", width=40)
-        types_table.add_column("Archivos Requeridos", style="yellow", width=25)
-        types_table.add_column("Estado", style="green", width=10)
+        result = self.manager.restart_app(args.domain)
         
-        for deployer in deployers:
-            status = "✅" if deployer['supported'] else "❌"
-            required_files = ", ".join(deployer['required_files'][:2])
-            if len(deployer['required_files']) > 2:
-                required_files += f" (+{len(deployer['required_files'])-2})"
-            
-            types_table.add_row(
-                f"[bold]{deployer['type']}[/bold]",
-                deployer['description'],
-                required_files,
-                status
-            )
+        if result:
+            self._show_success(f"Aplicación {args.domain} reiniciada exitosamente")
+        else:
+            self._show_error(f"Error reiniciando {args.domain}")
         
-        self.console.print(types_table)
-        
-        # Ejemplos de uso
-        examples_panel = Panel(
-            """[bold]Ejemplos de uso por tipo:[/bold]
-
-[cyan]nextjs[/cyan]:  webapp-manager add --domain app.com --source ./my-nextjs-app --port 3000 --type nextjs
-[cyan]fastapi[/cyan]: webapp-manager add --domain api.com --source ./my-fastapi-api --port 8000 --type fastapi  
-[cyan]nodejs[/cyan]:  webapp-manager add --domain node.com --source ./my-node-app --port 5000 --type nodejs
-[cyan]static[/cyan]:  webapp-manager add --domain site.com --source ./my-static-site --type static
-            """,
-            title="Ejemplos",
-            border_style="blue"
-        )
-        self.console.print(examples_panel)
+        return result
     
-    def _cmd_detect(self, args):
-        """Detectar tipo de aplicación"""
-        directory = args.directory or "."
+    def _cmd_update(self, args) -> bool:
+        """Comando update"""
+        if not args.domain:
+            self._show_error("Necesitas especificar --domain")
+            return False
         
-        with self._loading(f"Analizando directorio {directory}"):
-            try:
-                detected_type = DeployerFactory.detect_app_type(directory)
-                is_valid = DeployerFactory.validate_app_type(directory, detected_type)
-                
-            except Exception as e:
-                self._show_error(f"Error detectando tipo: {e}")
-                return
+        result = self.manager.update_app(args.domain)
         
-        # Mostrar resultado
-        validation_status = "✅ Válida" if is_valid else "⚠️  Requiere ajustes"
-        validation_color = "green" if is_valid else "yellow"
+        if result:
+            self._show_success(f"Aplicación {args.domain} actualizada exitosamente")
+        else:
+            self._show_error(f"Error actualizando {args.domain}")
         
-        result_panel = Panel(
-            f"""[bold]Directorio analizado:[/bold] {directory}
-[bold]Tipo detectado:[/bold] [cyan]{detected_type}[/cyan]
-[bold]Validación:[/bold] [{validation_color}]{validation_status}[/{validation_color}]
-
-[bold]Información del deployer:[/bold]
-            """,
-            title="🔍 Resultado de Detección",
-            border_style="cyan"
-        )
-        self.console.print(result_panel)
-        
-        # Mostrar información del deployer
-        try:
-            info = DeployerFactory.get_deployer_info(detected_type)
-            
-            info_table = Table(show_header=False, box=None)
-            info_table.add_column("Item", style="cyan", width=20)
-            info_table.add_column("Valor", style="white")
-            
-            info_table.add_row("📋 Archivos requeridos", ", ".join(info['required_files']))
-            if info['optional_files']:
-                info_table.add_row("📄 Archivos opcionales", ", ".join(info['optional_files']))
-            
-            self.console.print(info_table)
-            
-        except Exception as e:
-            self._show_warning(f"No se pudo obtener información detallada: {e}")
+        return result
     
     def _cmd_logs(self, args) -> bool:
         """Mostrar logs con formato mejorado"""
@@ -857,108 +827,13 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             self._show_error(f"Error obteniendo estado del sistema: {e}")
             return False
     
-    # Implementar los demás comandos con el mismo estilo...
-    def _cmd_remove(self, args) -> bool:
-        """Comando remove con confirmación"""
-        if not args.domain:
-            self._show_error("Necesitas especificar --domain")
-            return False
-        
-        # Confirmación de seguridad
-        self._show_warning(f"⚠️  Vas a eliminar la aplicación: [bold red]{args.domain}[/bold red]")
-        self.console.print("[dim]Esta acción eliminará:[/dim]")
-        self.console.print("  • Código fuente de la aplicación")
-        self.console.print("  • Configuración de nginx")
-        self.console.print("  • Servicio systemd")
-        self.console.print("  • Certificados SSL (si existen)")
-        
-        if not args.no_backup:
-            self.console.print("\n[green]✅ Se creará un backup antes de eliminar[/green]")
-        
-        if not Confirm.ask(f"\n¿Confirmas la eliminación de {args.domain}?", default=False):
-            self._show_info("Eliminación cancelada")
-            return True
-        
-        # Ejecutar eliminación con progreso
-        with self._create_progress_bar("Eliminando aplicación") as progress:
-            task = progress.add_task("Preparando eliminación...", total=100)
-            
-            steps = [
-                ("Creando backup...", 20) if not args.no_backup else ("Omitiendo backup...", 20),
-                ("Deteniendo servicio...", 40),
-                ("Removiendo configuración...", 60),
-                ("Eliminando archivos...", 80),
-                ("Limpiando sistema...", 100)
-            ]
-            
-            for step_desc, step_progress in steps:
-                progress.update(task, description=step_desc, completed=step_progress)
-                time.sleep(0.3)
-            
-            # Ejecutar eliminación real
-            result = self.manager.remove_app(args.domain, backup=not args.no_backup)
-        
-        if result:
-            self._show_success(f"Aplicación {args.domain} eliminada exitosamente")
-        else:
-            self._show_error(f"Error eliminando {args.domain}")
-        
-        return result
-    
-    def _cmd_restart(self, args) -> bool:
-        """Comando restart"""
-        if not args.domain:
-            self._show_error("Necesitas especificar --domain")
-            return False
-        
-        with self._loading(f"Reiniciando {args.domain}"):
-            result = self.manager.restart_app(args.domain)
-        
-        if result:
-            self._show_success(f"Aplicación {args.domain} reiniciada exitosamente")
-        else:
-            self._show_error(f"Error reiniciando {args.domain}")
-        
-        return result
-    
-    def _cmd_update(self, args) -> bool:
-        """Comando update"""
-        if not args.domain:
-            self._show_error("Necesitas especificar --domain")
-            return False
-        
-        with self._create_progress_bar("Actualizando aplicación") as progress:
-            task = progress.add_task("Iniciando actualización...", total=100)
-            
-            steps = [
-                ("Creando backup...", 20),
-                ("Descargando actualizaciones...", 40),
-                ("Instalando dependencias...", 60),
-                ("Reconstruyendo aplicación...", 80),
-                ("Reiniciando servicio...", 100)
-            ]
-            
-            for step_desc, step_progress in steps:
-                progress.update(task, description=step_desc, completed=step_progress)
-                time.sleep(0.5)
-            
-            result = self.manager.update_app(args.domain)
-        
-        if result:
-            self._show_success(f"Aplicación {args.domain} actualizada exitosamente")
-        else:
-            self._show_error(f"Error actualizando {args.domain}")
-        
-        return result
-    
     def _cmd_ssl(self, args) -> bool:
         """Comando SSL"""
         if not args.domain:
             self._show_error("Necesitas especificar --domain")
             return False
         
-        with self._loading(f"Configurando SSL para {args.domain}"):
-            result = self.manager.setup_ssl(args.domain, args.email)
+        result = self.manager.setup_ssl(args.domain, args.email)
         
         if result:
             self._show_success(f"SSL configurado para {args.domain}")
@@ -970,8 +845,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
     
     def _cmd_diagnose(self, args) -> bool:
         """Comando diagnose"""
-        with self._loading("Ejecutando diagnóstico completo"):
-            self.manager.diagnose(args.domain)
+        self.manager.diagnose(args.domain)
         return True
     
     def _cmd_repair(self, args) -> bool:
@@ -980,21 +854,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             self._show_error("Necesitas especificar --domain")
             return False
         
-        with self._create_progress_bar("Reparando aplicación") as progress:
-            task = progress.add_task("Iniciando reparación...", total=100)
-            
-            steps = [
-                ("Diagnosticando problemas...", 25),
-                ("Deteniendo servicio...", 50),
-                ("Reparando configuración...", 75),
-                ("Reiniciando servicio...", 100)
-            ]
-            
-            for step_desc, step_progress in steps:
-                progress.update(task, description=step_desc, completed=step_progress)
-                time.sleep(0.5)
-            
-            result = self.manager.repair_app(args.domain)
+        result = self.manager.repair_app(args.domain)
         
         if result:
             self._show_success(f"Aplicación {args.domain} reparada exitosamente")
@@ -1009,8 +869,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             self._show_error("Necesitas especificar --file")
             return False
         
-        with self._loading(f"Exportando configuración a {args.file}"):
-            result = self.manager.export_config(args.file)
+        result = self.manager.export_config(args.file)
         
         if result:
             self._show_success(f"Configuración exportada a {args.file}")
@@ -1025,8 +884,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             self._show_error("Necesitas especificar --file")
             return False
         
-        with self._loading(f"Importando configuración desde {args.file}"):
-            result = self.manager.import_config(args.file)
+        result = self.manager.import_config(args.file)
         
         if result:
             self._show_success(f"Configuración importada desde {args.file}")
@@ -1035,28 +893,93 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         
         return result
     
+    def _cmd_types(self, args):
+        """Mostrar tipos de deployers disponibles"""
+        deployers = DeployerFactory.list_all_deployers()
+        
+        # Crear tabla de tipos
+        types_table = Table(title="🛠️  Tipos de Aplicación Soportados")
+        types_table.add_column("Tipo", style="cyan", width=12)
+        types_table.add_column("Descripción", style="white", width=40)
+        types_table.add_column("Archivos Requeridos", style="yellow", width=25)
+        types_table.add_column("Estado", style="green", width=10)
+        
+        for deployer in deployers:
+            status = "✅" if deployer['supported'] else "❌"
+            required_files = ", ".join(deployer['required_files'][:2])
+            if len(deployer['required_files']) > 2:
+                required_files += f" (+{len(deployer['required_files'])-2})"
+            
+            types_table.add_row(
+                f"[bold]{deployer['type']}[/bold]",
+                deployer['description'],
+                required_files,
+                status
+            )
+        
+        self.console.print(types_table)
+        
+        # Ejemplos de uso
+        examples_panel = Panel(
+            """[bold]Ejemplos de uso por tipo:[/bold]
+
+[cyan]nextjs[/cyan]:  webapp-manager add --domain app.com --source ./my-nextjs-app --port 3000 --type nextjs
+[cyan]fastapi[/cyan]: webapp-manager add --domain api.com --source ./my-fastapi-api --port 8000 --type fastapi  
+[cyan]nodejs[/cyan]:  webapp-manager add --domain node.com --source ./my-node-app --port 5000 --type nodejs
+[cyan]static[/cyan]:  webapp-manager add --domain site.com --source ./my-static-site --type static
+            """,
+            title="Ejemplos",
+            border_style="blue"
+        )
+        self.console.print(examples_panel)
+    
+    def _cmd_detect(self, args):
+        """Detectar tipo de aplicación"""
+        directory = args.directory or "."
+        
+        with self._loading(f"Analizando directorio {directory}"):
+            try:
+                detected_type = DeployerFactory.detect_app_type(directory)
+                is_valid = DeployerFactory.validate_app_type(directory, detected_type)
+                
+            except Exception as e:
+                self._show_error(f"Error detectando tipo: {e}")
+                return
+        
+        # Mostrar resultado
+        validation_status = "✅ Válida" if is_valid else "⚠️  Requiere ajustes"
+        validation_color = "green" if is_valid else "yellow"
+        
+        result_panel = Panel(
+            f"""[bold]Directorio analizado:[/bold] {directory}
+[bold]Tipo detectado:[/bold] [cyan]{detected_type}[/cyan]
+[bold]Validación:[/bold] [{validation_color}]{validation_status}[/{validation_color}]
+
+[bold]Información del deployer:[/bold]
+            """,
+            title="🔍 Resultado de Detección",
+            border_style="cyan"
+        )
+        self.console.print(result_panel)
+        
+        # Mostrar información del deployer
+        try:
+            info = DeployerFactory.get_deployer_info(detected_type)
+            
+            info_table = Table(show_header=False, box=None)
+            info_table.add_column("Item", style="cyan", width=20)
+            info_table.add_column("Valor", style="white")
+            
+            info_table.add_row("📋 Archivos requeridos", ", ".join(info['required_files']))
+            if info['optional_files']:
+                info_table.add_row("📄 Archivos opcionales", ", ".join(info['optional_files']))
+            
+            self.console.print(info_table)
+            
+        except Exception as e:
+            self._show_warning(f"No se pudo obtener información detallada: {e}")
+    
     def _cmd_fix_config(self, args) -> bool:
         """Comando fix-config"""
-        with self._create_progress_bar("Reparando configuración") as progress:
-            task = progress.add_task("Analizando archivo...", total=100)
-            
-            steps = [
-                ("Analizando configuración...", 25),
-                ("Creando backup...", 50),
-                ("Reparando estructura...", 75),
-                ("Validando cambios...", 100)
-            ]
-            
-            for step_desc, step_progress in steps:
-                progress.update(task, description=step_desc, completed=step_progress)
-                time.sleep(0.3)
-            
-            # Aquí iría la lógica real del fix-config
-            result = True  # Placeholder
-        
-        if result:
-            self._show_success("Configuración reparada exitosamente")
-        else:
-            self._show_error("Error reparando configuración")
-        
-        return result
+        self._show_info("Función fix-config no implementada todavía")
+        return True

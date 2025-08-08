@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 from ..config import ConfigManager
 from ..models import AppConfig, GlobalConfig, SystemPaths
 from ..services import AppService, NginxService, SystemdService
-from ..utils import Colors, CommandRunner, Validators
+from ..utils import Colors, CommandRunner, Validators, ProgressManager
 
 # Configurar logging con manejo de errores
 log_dir = Path("/var/log") if os.name == "posix" else Path("./logs")
@@ -33,23 +33,32 @@ logger = logging.getLogger(__name__)
 class WebAppManager:
     """Gestor principal de aplicaciones web"""
     
-    def __init__(self):
+    def __init__(self, verbose: bool = False, progress_manager: Optional[ProgressManager] = None):
+        # Configurar verbose y progress manager
+        self.verbose = verbose
+        self.progress = progress_manager
+        
         # Inicializar rutas del sistema
         self.paths = SystemPaths()
         self._init_paths()
         
-        # Inicializar servicios
+        # Inicializar servicios con modo verbose
         self.config_manager = ConfigManager(self.paths.config_file, self.paths.backup_dir)
-        self.app_service = AppService(self.paths.apps_dir)
+        self.app_service = AppService(self.paths.apps_dir, verbose=verbose, progress_manager=progress_manager)
         self.nginx_service = NginxService(
             self.paths.nginx_sites, 
             self.paths.nginx_enabled, 
-            self.paths.nginx_conf
+            self.paths.nginx_conf,
+            verbose=verbose
         )
-        self.systemd_service = SystemdService(self.paths.systemd_dir, self.paths.apps_dir)
+        self.systemd_service = SystemdService(
+            self.paths.systemd_dir, 
+            self.paths.apps_dir,
+            verbose=verbose
+        )
         
         # Utilidades
-        self.cmd = CommandRunner()
+        self.cmd = CommandRunner(verbose=verbose)
         
         # Inicializar sistema
         self._ensure_directories()
@@ -89,13 +98,15 @@ class WebAppManager:
             except Exception as e:
                 logger.error(f"Error creando directorio {directory}: {e}")
     
-    def _check_prerequisites(self):
+    def _check_prerequisites(self, force_verbose: bool = False):
         """Verificar prerrequisitos del sistema"""
         # Solo verificar prerrequisitos en sistemas Unix para comandos que requieren despliegue
         if os.name != 'posix':
             return
             
-        print(Colors.header("Verificando Prerrequisitos del Sistema"))
+        show_output = self.verbose or force_verbose
+        if show_output:
+            print(Colors.header("Verificando Prerrequisitos del Sistema"))
 
         required_commands = [
             ("nginx", "nginx -v"),
@@ -110,50 +121,63 @@ class WebAppManager:
             if not self.cmd.test_command_exists(cmd):
                 missing.append(cmd)
             else:
-                version = self.cmd.run(test_cmd, check=False)
-                print(Colors.success(f"{cmd}: {version}"))
+                if show_output:
+                    version = self.cmd.run(test_cmd, check=False)
+                    print(Colors.success(f"{cmd}: {version}"))
 
         if missing:
-            print(Colors.error(f"Comandos faltantes: {', '.join(missing)}"))
+            if self.progress:
+                self.progress.error(f"Comandos faltantes: {', '.join(missing)}")
+            else:
+                print(Colors.error(f"Comandos faltantes: {', '.join(missing)}"))
             print(Colors.info("Instala los prerrequisitos con:"))
             print(Colors.info("sudo apt update && sudo apt install -y nginx nodejs npm git"))
             sys.exit(1)
 
-        # Configurar nginx
-        self._setup_nginx_configuration()
+        # Configurar nginx (silencioso por defecto)
+        self._setup_nginx_configuration(show_output)
     
-    def _setup_nginx_configuration(self):
+    def _setup_nginx_configuration(self, show_output: bool = False):
         """Configurar nginx con todas las correcciones necesarias"""
-        print(Colors.info("Configurando nginx..."))
+        if self.progress:
+            self.progress.info("Configurando nginx...")
+        elif show_output:
+            print(Colors.info("Configurando nginx..."))
 
         # Verificar que nginx.conf existe
         if not self.paths.nginx_conf.exists():
-            print(Colors.error("Archivo nginx.conf no encontrado"))
+            if self.progress:
+                self.progress.error("Archivo nginx.conf no encontrado")
+            else:
+                print(Colors.error("Archivo nginx.conf no encontrado"))
             return False
 
         # Verificar directorios de log
         nginx_log_dir = Path("/var/log/nginx")
         if not nginx_log_dir.exists():
-            print(Colors.warning("Directorio /var/log/nginx no existe, creándolo..."))
+            if show_output:
+                print(Colors.warning("Directorio /var/log/nginx no existe, creándolo..."))
             nginx_log_dir.mkdir(parents=True, exist_ok=True)
             self.cmd.run_sudo("chown -R www-data:adm /var/log/nginx", check=False)
 
         # Asegurar que la zona webapp_global existe
-        self._ensure_webapp_global_zone()
+        self._ensure_webapp_global_zone(show_output)
 
         # Limpiar configuraciones problemáticas
         self._cleanup_nginx_sites()
 
         # Verificar configuración
         if self.nginx_service.test_config():
-            print(Colors.success("Configuración de nginx válida"))
+            if show_output:
+                print(Colors.success("Configuración de nginx válida"))
             return True
         else:
-            print(Colors.warning("Problemas en configuración nginx, intentando corregir..."))
+            if show_output:
+                print(Colors.warning("Problemas en configuración nginx, intentando corregir..."))
             self._fix_common_nginx_issues()
             return self.nginx_service.test_config()
     
-    def _ensure_webapp_global_zone(self):
+    def _ensure_webapp_global_zone(self, show_output: bool = False):
         """Asegurar que la zona webapp_global existe en nginx.conf"""
         try:
             # Leer nginx.conf actual
@@ -162,7 +186,8 @@ class WebAppManager:
 
             # Verificar si ya existe la zona webapp_global
             if "zone=webapp_global" in content:
-                print(Colors.info("Zona webapp_global ya existe en nginx.conf"))
+                if show_output:
+                    print(Colors.info("Zona webapp_global ya existe en nginx.conf"))
                 return True
 
             # Agregar la zona
@@ -171,7 +196,10 @@ class WebAppManager:
             match = re.search(http_pattern, content, re.DOTALL)
 
             if not match:
-                print(Colors.error("No se pudo encontrar el bloque http en nginx.conf"))
+                if self.progress:
+                    self.progress.error("No se pudo encontrar el bloque http en nginx.conf")
+                else:
+                    print(Colors.error("No se pudo encontrar el bloque http en nginx.conf"))
                 return False
 
             # Insertar la zona webapp_global
@@ -193,17 +221,22 @@ class WebAppManager:
             from datetime import datetime
             backup_path = f"{self.paths.nginx_conf}.backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             shutil.copy2(self.paths.nginx_conf, backup_path)
-            print(Colors.info(f"Backup de nginx.conf creado: {backup_path}"))
+            if self.verbose:
+                print(Colors.info(f"Backup de nginx.conf creado: {backup_path}"))
 
             # Escribir nueva configuración
             with open(self.paths.nginx_conf, "w") as f:
                 f.write(new_content)
 
-            print(Colors.success("Zona webapp_global agregada a nginx.conf"))
+            if self.verbose:
+                print(Colors.success("Zona webapp_global agregada a nginx.conf"))
             return True
 
         except Exception as e:
-            print(Colors.error(f"Error configurando zona webapp_global: {e}"))
+            if self.progress:
+                self.progress.error(f"Error configurando zona webapp_global: {e}")
+            else:
+                print(Colors.error(f"Error configurando zona webapp_global: {e}"))
             return False
     
     def _cleanup_nginx_sites(self):
@@ -211,12 +244,14 @@ class WebAppManager:
         if self.paths.nginx_enabled.exists():
             for link in self.paths.nginx_enabled.iterdir():
                 if link.is_symlink() and not link.resolve().exists():
-                    print(Colors.info(f"Removiendo enlace huérfano: {link}"))
+                    if self.verbose:
+                        print(Colors.info(f"Removiendo enlace huérfano: {link}"))
                     link.unlink()
     
     def _fix_common_nginx_issues(self):
         """Corregir problemas comunes de nginx"""
-        print(Colors.info("Intentando corregir problemas comunes..."))
+        if self.verbose:
+            print(Colors.info("Intentando corregir problemas comunes..."))
 
         # Verificar permisos en logs
         self.cmd.run_sudo("chmod -R 755 /var/log/nginx", check=False)
@@ -228,6 +263,10 @@ class WebAppManager:
             if not Path(log_file).exists():
                 self.cmd.run_sudo(f"touch {log_file}", check=False)
                 self.cmd.run_sudo(f"chown www-data:adm {log_file}", check=False)
+    
+    def check_prerequisites(self):
+        """Verificar prerrequisitos del sistema (versión pública con output)"""
+        self._check_prerequisites(force_verbose=True)
     
     def add_app(
         self,
@@ -241,9 +280,144 @@ class WebAppManager:
         start_command: str = "",
         env_vars: Optional[Dict[str, str]] = None,
     ) -> bool:
-        """Agregar nueva aplicación"""
-        print(Colors.header(f"Agregando Aplicación: {domain}"))
+        """Agregar nueva aplicación con progreso real"""
+        # Verificar prerrequisitos visiblemente para comandos de despliegue
+        self.check_prerequisites()
+        
+        if self.verbose:
+            print(Colors.header(f"Agregando Aplicación: {domain}"))
 
+        # Total de pasos del proceso
+        total_steps = 8
+        
+        # Usar progress manager si está disponible
+        if self.progress:
+            with self.progress.task(f"Desplegando {domain}", total=total_steps) as task_id:
+                return self._add_app_with_progress(
+                    task_id, domain, source_path, port, app_type, 
+                    branch, ssl, build_command, start_command, env_vars
+                )
+        else:
+            # Modo legacy sin progress manager
+            return self._add_app_legacy(
+                domain, source_path, port, app_type, 
+                branch, ssl, build_command, start_command, env_vars
+            )
+    
+    def _add_app_with_progress(
+        self,
+        task_id: str,
+        domain: str,
+        source_path: str,
+        port: int,
+        app_type: str = "nextjs",
+        branch: str = "main",
+        ssl: bool = True,
+        build_command: str = "",
+        start_command: str = "",
+        env_vars: Optional[Dict[str, str]] = None,
+    ) -> bool:
+        """Agregar aplicación con progress manager"""
+        try:
+            # Paso 1: Validaciones
+            self.progress.update(task_id, advance=1, description="Validando parámetros...")
+            
+            if not Validators.validate_domain(domain):
+                self.progress.error(f"Dominio inválido: {domain}")
+                return False
+
+            if not Validators.validate_port(port):
+                self.progress.error(f"Puerto inválido: {port}. Debe estar entre 1024-65535")
+                return False
+
+            if self.config_manager.is_port_in_use(port):
+                self.progress.error(f"Puerto {port} ya está en uso")
+                return False
+
+            if self.config_manager.app_exists(domain):
+                self.progress.error(f"Aplicación {domain} ya existe")
+                return False
+
+            if not Validators.validate_app_type(app_type):
+                self.progress.error(f"Tipo de aplicación inválido: {app_type}")
+                return False
+
+            # Crear configuración de aplicación
+            app_config = AppConfig.create_new(
+                domain=domain,
+                port=port,
+                app_type=app_type,
+                source=source_path,
+                branch=branch,
+                ssl=ssl,
+                build_command=build_command,
+                start_command=start_command,
+                env_vars=env_vars
+            )
+
+            # Paso 2: Desplegar aplicación
+            self.progress.update(task_id, advance=1, description="Desplegando aplicación...")
+            if not self.app_service.deploy_app(app_config):
+                return False
+
+            # Paso 3: Configurar nginx
+            self.progress.update(task_id, advance=1, description="Configurando nginx...")
+            if not self.nginx_service.create_config(app_config):
+                self.progress.warning("Problemas con nginx, pero continuando...")
+
+            # Paso 4: Crear servicio systemd
+            self.progress.update(task_id, advance=1, description="Creando servicio systemd...")
+            if not self.systemd_service.create_service(app_config, env_vars):
+                return False
+
+            # Paso 5: Iniciar servicio
+            self.progress.update(task_id, advance=1, description="Iniciando servicio...")
+            if not self.systemd_service.start_and_verify(domain, port):
+                return False
+
+            # Paso 6: Recargar nginx
+            self.progress.update(task_id, advance=1, description="Recargando nginx...")
+            self.nginx_service.reload()
+
+            # Paso 7: Verificar conectividad
+            self.progress.update(task_id, advance=1, description="Verificando conectividad...")
+            self.app_service.test_connectivity(domain, port)
+
+            # Paso 8: SSL
+            if ssl:
+                self.progress.update(task_id, advance=1, description="Configurando SSL...")
+                ssl_success = self.setup_ssl(domain)
+                if not ssl_success:
+                    self.progress.warning("SSL no configurado, aplicación disponible solo en HTTP")
+                    app_config.ssl = False
+            else:
+                self.progress.update(task_id, advance=1, description="Finalizando...")
+
+            # Marcar como activa y guardar configuración
+            app_config.set_active()
+            self.config_manager.add_app(app_config)
+
+            self.progress.success(f"Aplicación {domain} agregada exitosamente!")
+            return True
+
+        except Exception as e:
+            self.progress.error(f"Error agregando aplicación: {e}")
+            self._cleanup_failed_deployment(domain)
+            return False
+    
+    def _add_app_legacy(
+        self,
+        domain: str,
+        source_path: str,
+        port: int,
+        app_type: str = "nextjs",
+        branch: str = "main",
+        ssl: bool = True,
+        build_command: str = "",
+        start_command: str = "",
+        env_vars: Optional[Dict[str, str]] = None,
+    ) -> bool:
+        """Agregar aplicación modo legacy (compatibilidad)"""
         # Validaciones
         print(Colors.step(1, 8, "Validando parámetros"))
         
@@ -349,31 +523,61 @@ class WebAppManager:
     
     def remove_app(self, domain: str, backup: bool = True) -> bool:
         """Remover aplicación"""
-        print(Colors.header(f"Removiendo Aplicación: {domain}"))
+        if self.verbose:
+            print(Colors.header(f"Removiendo Aplicación: {domain}"))
 
         if not self.config_manager.app_exists(domain):
-            print(Colors.error(f"Aplicación {domain} no encontrada"))
+            if self.progress:
+                self.progress.error(f"Aplicación {domain} no encontrada")
+            else:
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
             return False
 
         try:
-            if backup:
-                print(Colors.step(1, 6, "Creando backup"))
-                self._backup_app(domain)
+            total_steps = 6
+            
+            if self.progress:
+                with self.progress.task(f"Removiendo {domain}", total=total_steps) as task_id:
+                    if backup:
+                        self.progress.update(task_id, advance=1, description="Creando backup...")
+                        self._backup_app(domain)
+                    else:
+                        self.progress.update(task_id, advance=1, description="Omitiendo backup...")
 
-            print(Colors.step(2, 6, "Deteniendo servicio"))
-            self.systemd_service.stop_service(domain)
+                    self.progress.update(task_id, advance=1, description="Deteniendo servicio...")
+                    self.systemd_service.stop_service(domain)
 
-            print(Colors.step(3, 6, "Removiendo servicio systemd"))
-            self.systemd_service.remove_service(domain)
+                    self.progress.update(task_id, advance=1, description="Removiendo servicio systemd...")
+                    self.systemd_service.remove_service(domain)
 
-            print(Colors.step(4, 6, "Removiendo configuración nginx"))
-            self.nginx_service.remove_config(domain)
+                    self.progress.update(task_id, advance=1, description="Removiendo configuración nginx...")
+                    self.nginx_service.remove_config(domain)
 
-            print(Colors.step(5, 6, "Removiendo certificado SSL"))
-            self.cmd.run_sudo(f"certbot delete --cert-name {domain}", check=False)
+                    self.progress.update(task_id, advance=1, description="Removiendo certificado SSL...")
+                    self.cmd.run_sudo(f"certbot delete --cert-name {domain}", check=False)
 
-            print(Colors.step(6, 6, "Removiendo aplicación"))
-            self.app_service.remove_app(domain)
+                    self.progress.update(task_id, advance=1, description="Removiendo aplicación...")
+                    self.app_service.remove_app(domain)
+            else:
+                # Modo legacy
+                if backup:
+                    print(Colors.step(1, 6, "Creando backup"))
+                    self._backup_app(domain)
+
+                print(Colors.step(2, 6, "Deteniendo servicio"))
+                self.systemd_service.stop_service(domain)
+
+                print(Colors.step(3, 6, "Removiendo servicio systemd"))
+                self.systemd_service.remove_service(domain)
+
+                print(Colors.step(4, 6, "Removiendo configuración nginx"))
+                self.nginx_service.remove_config(domain)
+
+                print(Colors.step(5, 6, "Removiendo certificado SSL"))
+                self.cmd.run_sudo(f"certbot delete --cert-name {domain}", check=False)
+
+                print(Colors.step(6, 6, "Removiendo aplicación"))
+                self.app_service.remove_app(domain)
 
             # Recargar servicios
             self.nginx_service.reload()
@@ -381,74 +585,131 @@ class WebAppManager:
             # Remover de configuración
             self.config_manager.remove_app(domain)
 
-            print(Colors.success(f"Aplicación {domain} removida exitosamente!"))
+            if self.progress:
+                self.progress.success(f"Aplicación {domain} removida exitosamente!")
+            else:
+                print(Colors.success(f"Aplicación {domain} removida exitosamente!"))
             return True
 
         except Exception as e:
-            print(Colors.error(f"Error removiendo aplicación: {e}"))
+            if self.progress:
+                self.progress.error(f"Error removiendo aplicación: {e}")
+            else:
+                print(Colors.error(f"Error removiendo aplicación: {e}"))
             return False
     
     def restart_app(self, domain: str) -> bool:
         """Reiniciar aplicación"""
-        print(Colors.header(f"Reiniciando Aplicación: {domain}"))
+        if self.verbose:
+            print(Colors.header(f"Reiniciando Aplicación: {domain}"))
 
         if not self.config_manager.app_exists(domain):
-            print(Colors.error(f"Aplicación {domain} no encontrada"))
+            if self.progress:
+                self.progress.error(f"Aplicación {domain} no encontrada")
+            else:
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
             return False
 
         try:
             app_config = self.config_manager.get_app(domain)
 
-            print(Colors.step(1, 2, "Reiniciando servicio"))
-            if not self.systemd_service.restart_service(domain):
-                print(Colors.error("Error reiniciando servicio"))
-                return False
+            if self.progress:
+                with self.progress.task(f"Reiniciando {domain}", total=2) as task_id:
+                    self.progress.update(task_id, advance=1, description="Reiniciando servicio...")
+                    if not self.systemd_service.restart_service(domain):
+                        self.progress.error("Error reiniciando servicio")
+                        return False
 
-            print(Colors.step(2, 2, "Verificando estado"))
-            return self.systemd_service.start_and_verify(domain, app_config.port)
+                    self.progress.update(task_id, advance=1, description="Verificando estado...")
+                    return self.systemd_service.start_and_verify(domain, app_config.port)
+            else:
+                print(Colors.step(1, 2, "Reiniciando servicio"))
+                if not self.systemd_service.restart_service(domain):
+                    print(Colors.error("Error reiniciando servicio"))
+                    return False
+
+                print(Colors.step(2, 2, "Verificando estado"))
+                return self.systemd_service.start_and_verify(domain, app_config.port)
 
         except Exception as e:
-            print(Colors.error(f"Error reiniciando {domain}: {e}"))
+            if self.progress:
+                self.progress.error(f"Error reiniciando {domain}: {e}")
+            else:
+                print(Colors.error(f"Error reiniciando {domain}: {e}"))
             return False
     
     def update_app(self, domain: str) -> bool:
         """Actualizar aplicación"""
-        print(Colors.header(f"Actualizando Aplicación: {domain}"))
+        # Verificar prerrequisitos visiblemente para comandos de despliegue
+        self.check_prerequisites()
+        
+        if self.verbose:
+            print(Colors.header(f"Actualizando Aplicación: {domain}"))
 
         if not self.config_manager.app_exists(domain):
-            print(Colors.error(f"Aplicación {domain} no encontrada"))
+            if self.progress:
+                self.progress.error(f"Aplicación {domain} no encontrada")
+            else:
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
             return False
 
         try:
             app_config = self.config_manager.get_app(domain)
 
-            # Detener servicio
-            print(Colors.step(1, 3, "Deteniendo servicio"))
-            self.systemd_service.stop_service(domain)
+            if self.progress:
+                with self.progress.task(f"Actualizando {domain}", total=3) as task_id:
+                    # Detener servicio
+                    self.progress.update(task_id, advance=1, description="Deteniendo servicio...")
+                    self.systemd_service.stop_service(domain)
 
-            # Actualizar aplicación
-            print(Colors.step(2, 3, "Actualizando código y reconstruyendo"))
-            if not self.app_service.update_app(domain, app_config):
-                # Intentar reiniciar servicio si falla
-                self.systemd_service.start_service(domain)
-                return False
+                    # Actualizar aplicación
+                    self.progress.update(task_id, advance=1, description="Actualizando código y reconstruyendo...")
+                    if not self.app_service.update_app(domain, app_config):
+                        # Intentar reiniciar servicio si falla
+                        self.systemd_service.start_service(domain)
+                        return False
 
-            # Reiniciar servicio
-            print(Colors.step(3, 3, "Reiniciando servicio"))
-            success = self.systemd_service.start_and_verify(domain, app_config.port)
+                    # Reiniciar servicio
+                    self.progress.update(task_id, advance=1, description="Reiniciando servicio...")
+                    success = self.systemd_service.start_and_verify(domain, app_config.port)
+            else:
+                # Detener servicio
+                print(Colors.step(1, 3, "Deteniendo servicio"))
+                self.systemd_service.stop_service(domain)
+
+                # Actualizar aplicación
+                print(Colors.step(2, 3, "Actualizando código y reconstruyendo"))
+                if not self.app_service.update_app(domain, app_config):
+                    # Intentar reiniciar servicio si falla
+                    self.systemd_service.start_service(domain)
+                    return False
+
+                # Reiniciar servicio
+                print(Colors.step(3, 3, "Reiniciando servicio"))
+                success = self.systemd_service.start_and_verify(domain, app_config.port)
 
             if success:
                 # Actualizar timestamp
                 app_config.update_timestamp()
                 self.config_manager.update_app(domain, app_config)
-                print(Colors.success(f"Aplicación {domain} actualizada exitosamente"))
+                
+                if self.progress:
+                    self.progress.success(f"Aplicación {domain} actualizada exitosamente")
+                else:
+                    print(Colors.success(f"Aplicación {domain} actualizada exitosamente"))
             else:
-                print(Colors.error("Error verificando aplicación después de actualización"))
+                if self.progress:
+                    self.progress.error("Error verificando aplicación después de actualización")
+                else:
+                    print(Colors.error("Error verificando aplicación después de actualización"))
 
             return success
 
         except Exception as e:
-            print(Colors.error(f"Error actualizando {domain}: {e}"))
+            if self.progress:
+                self.progress.error(f"Error actualizando {domain}: {e}")
+            else:
+                print(Colors.error(f"Error actualizando {domain}: {e}"))
             return False
     
     def list_apps(self, detailed: bool = False):
@@ -473,120 +734,27 @@ class WebAppManager:
         except Exception as e:
             logger.error(f"Error al listar aplicaciones: {e}")
             return []
-
-    def list_apps_console(self, detailed: bool = False):
-        """Listar aplicaciones en consola - versión mejorada con Rich"""
-        from rich.table import Table
-        from rich.panel import Panel
-        
-        try:
-            apps = self.config_manager.get_all_apps()
-            if not apps:
-                self.console.print(Panel(
-                    "[yellow]No hay aplicaciones instaladas[/yellow]\n\n"
-                    "Para desplegar tu primera aplicación:\n"
-                    "[cyan]webapp-manager add --domain ejemplo.com --source /ruta --port 3000[/cyan]",
-                    title="Sin Aplicaciones",
-                    border_style="yellow"
-                ))
-                return
-
-            # Crear tabla moderna
-            table = Table(title=f"📱 Aplicaciones Instaladas ({len(apps)})")
-            
-            table.add_column("🌐 Dominio", style="cyan", width=25)
-            table.add_column("📱 Tipo", style="magenta", width=12)
-            table.add_column("🚪 Puerto", style="yellow", width=8)
-            table.add_column("⚡ Estado", style="white", width=15)
-            table.add_column("🔒 SSL", style="blue", width=6)
-            
-            if detailed:
-                table.add_column("📅 Creado", style="dim", width=12)
-                table.add_column("📂 Fuente", style="dim", width=30)
-
-            for i, (domain, app_config) in enumerate(apps.items(), 1):
-                try:
-                    status = self.systemd_service.get_service_status(domain)
-                    
-                    # Determinar color y icono del estado
-                    if "Activo" in status:
-                        status_display = "[green]🟢 Activo[/green]"
-                    elif "Inactivo" in status:
-                        status_display = "[yellow]🟡 Inactivo[/yellow]"
-                    elif "Fallido" in status:
-                        status_display = "[red]🔴 Fallido[/red]"
-                    else:
-                        status_display = "[dim]🔘 Desconocido[/dim]"
-
-                    ssl_icon = "✅" if app_config.ssl else "❌"
-
-                    row_data = [
-                        domain,
-                        app_config.app_type,
-                        str(app_config.port),
-                        status_display,
-                        ssl_icon
-                    ]
-
-                    if detailed:
-                        row_data.extend([
-                            app_config.created[:10] if app_config.created else "N/A",
-                            app_config.source[:30] + "..." if len(app_config.source) > 30 else app_config.source
-                        ])
-
-                    table.add_row(*row_data)
-
-                except Exception as e:
-                    # Mostrar fila de error
-                    error_row = [
-                        domain,
-                        "Error",
-                        "N/A", 
-                        "[red]🔴 Error[/red]",
-                        "❌"
-                    ]
-                    if detailed:
-                        error_row.extend(["Error", "Error"])
-                    
-                    table.add_row(*error_row)
-                    continue
-
-            self.console.print(table)
-            
-            # Estadísticas
-            active_count = sum(1 for domain, _ in apps.items() 
-                            if "Activo" in self.systemd_service.get_service_status(domain))
-            ssl_count = sum(1 for _, app in apps.items() if app.ssl)
-            
-            stats_panel = Panel(
-                f"[bold]📊 Resumen:[/bold]\n"
-                f"• Total: {len(apps)} aplicaciones\n"
-                f"• Activas: [green]{active_count}[/green]\n"
-                f"• Con SSL: [blue]{ssl_count}[/blue]\n"
-                f"• Rate: [cyan]{active_count/len(apps)*100:.1f}%[/cyan]",
-                title="Estadísticas",
-                border_style="green"
-            )
-            self.console.print(stats_panel)
-                    
-        except Exception as e:
-            self.console.print(f"[bold red]❌ Error al listar aplicaciones: {e}[/bold red]")
-            logger.error(f"Error al listar aplicaciones: {e}")
     
     def logs(self, domain: str, lines: int = 50, follow: bool = False) -> bool:
         """Mostrar logs de aplicación"""
         if not self.config_manager.app_exists(domain):
-            print(Colors.error(f"Aplicación {domain} no encontrada"))
+            if self.progress:
+                self.progress.error(f"Aplicación {domain} no encontrada")
+            else:
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
             return False
 
-        print(Colors.header(f"Logs de {domain}"))
+        if self.verbose:
+            print(Colors.header(f"Logs de {domain}"))
 
         try:
-            print(f"\n{Colors.bold(f'📋 Logs del Servicio ({lines} líneas):')}")
-            print("-" * 80)
+            if self.verbose:
+                print(f"\n{Colors.bold(f'📋 Logs del Servicio ({lines} líneas):')}")
+                print("-" * 80)
 
             if follow:
-                print(Colors.info("Siguiendo logs en tiempo real (Ctrl+C para salir)..."))
+                if self.verbose:
+                    print(Colors.info("Siguiendo logs en tiempo real (Ctrl+C para salir)..."))
                 self.cmd.run_sudo(f"journalctl -u {domain}.service -f", capture_output=False)
             else:
                 self.cmd.run_sudo(f"journalctl -u {domain}.service -n {lines} --no-pager", capture_output=False)
@@ -596,22 +764,28 @@ class WebAppManager:
             nginx_error = f"/var/log/apps/{domain}-error.log"
 
             if os.path.exists(nginx_access):
-                print(f"\n{Colors.bold('📊 Nginx Access Log (últimas 20 líneas):')}")
-                print("-" * 80)
+                if self.verbose:
+                    print(f"\n{Colors.bold('📊 Nginx Access Log (últimas 20 líneas):')}")
+                    print("-" * 80)
                 self.cmd.run(f"tail -n 20 {nginx_access}", capture_output=False)
 
             if os.path.exists(nginx_error) and os.path.getsize(nginx_error) > 0:
-                print(f"\n{Colors.bold('⚠️ Nginx Error Log (últimas 20 líneas):')}")
-                print("-" * 80)
+                if self.verbose:
+                    print(f"\n{Colors.bold('⚠️ Nginx Error Log (últimas 20 líneas):')}")
+                    print("-" * 80)
                 self.cmd.run(f"tail -n 20 {nginx_error}", capture_output=False)
 
             return True
 
         except KeyboardInterrupt:
-            print(Colors.info("\nSaliendo de logs..."))
+            if self.verbose:
+                print(Colors.info("\nSaliendo de logs..."))
             return True
         except Exception as e:
-            print(Colors.error(f"Error mostrando logs: {e}"))
+            if self.progress:
+                self.progress.error(f"Error mostrando logs: {e}")
+            else:
+                print(Colors.error(f"Error mostrando logs: {e}"))
             return False
     
     def setup_ssl(self, domain: str, email: str = None) -> bool:
@@ -620,11 +794,15 @@ class WebAppManager:
             if not email:
                 email = f"admin@{domain}"
 
-            print(Colors.info(f"Configurando SSL para {domain}..."))
+            if self.progress:
+                self.progress.info(f"Configurando SSL para {domain}...")
+            elif self.verbose:
+                print(Colors.info(f"Configurando SSL para {domain}..."))
 
             # Instalar certbot si no existe
             if not self.cmd.test_command_exists("certbot"):
-                print(Colors.info("Instalando certbot..."))
+                if self.verbose:
+                    print(Colors.info("Instalando certbot..."))
                 self.cmd.run_sudo("apt update")
                 self.cmd.run_sudo("apt install -y certbot python3-certbot-nginx")
 
@@ -633,14 +811,23 @@ class WebAppManager:
             result = self.cmd.run_sudo(cmd, check=False)
 
             if result and "Congratulations" in result:
-                print(Colors.success(f"SSL configurado exitosamente para {domain}"))
+                if self.progress:
+                    self.progress.success(f"SSL configurado exitosamente para {domain}")
+                else:
+                    print(Colors.success(f"SSL configurado exitosamente para {domain}"))
                 return True
             else:
-                print(Colors.error(f"Error configurando SSL: {result}"))
+                if self.progress:
+                    self.progress.error(f"Error configurando SSL: {result}")
+                else:
+                    print(Colors.error(f"Error configurando SSL: {result}"))
                 return False
 
         except Exception as e:
-            print(Colors.error(f"Error configurando SSL: {e}"))
+            if self.progress:
+                self.progress.error(f"Error configurando SSL: {e}")
+            else:
+                print(Colors.error(f"Error configurando SSL: {e}"))
             return False
     
     def diagnose(self, domain: str = None):
@@ -652,10 +839,14 @@ class WebAppManager:
     
     def _diagnose_app(self, domain: str):
         """Diagnosticar aplicación específica"""
-        print(Colors.header(f"Diagnóstico de {domain}"))
+        if self.verbose:
+            print(Colors.header(f"Diagnóstico de {domain}"))
 
         if not self.config_manager.app_exists(domain):
-            print(Colors.error(f"Aplicación {domain} no encontrada"))
+            if self.progress:
+                self.progress.error(f"Aplicación {domain} no encontrada")
+            else:
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
             return
 
         app_config = self.config_manager.get_app(domain)
@@ -665,27 +856,31 @@ class WebAppManager:
         if not self.systemd_service.is_service_active(domain):
             issues.append("❌ Servicio no activo")
         else:
-            print(Colors.success("Servicio activo"))
+            if self.verbose:
+                print(Colors.success("Servicio activo"))
 
         # Verificar puerto
         port_check = self.cmd.run_sudo(f'netstat -tlnp | grep :{app_config.port}', check=False)
         if not port_check:
             issues.append(f"❌ Puerto {app_config.port} no está escuchando")
         else:
-            print(Colors.success(f"Puerto {app_config.port} activo"))
+            if self.verbose:
+                print(Colors.success(f"Puerto {app_config.port} activo"))
 
         # Verificar nginx
         nginx_config = self.paths.nginx_sites / domain
         if not nginx_config.exists():
             issues.append(f"❌ Configuración nginx no existe: {nginx_config}")
         else:
-            print(Colors.success("Configuración nginx existe"))
+            if self.verbose:
+                print(Colors.success("Configuración nginx existe"))
 
         # Verificar conectividad
         if not self.app_service.test_connectivity(domain, app_config.port):
             issues.append(f"❌ Aplicación no responde en puerto {app_config.port}")
         else:
-            print(Colors.success("Aplicación responde correctamente"))
+            if self.verbose:
+                print(Colors.success("Aplicación responde correctamente"))
 
         # Mostrar problemas encontrados
         if issues:
@@ -699,11 +894,13 @@ class WebAppManager:
             print(f"  3. Verificar configuración nginx: sudo nginx -t")
             print(f"  4. Actualizar aplicación: webapp-manager update --domain {domain}")
         else:
-            print(Colors.success("No se encontraron problemas"))
+            if self.verbose:
+                print(Colors.success("No se encontraron problemas"))
     
     def _diagnose_system(self):
         """Diagnosticar sistema general"""
-        print(Colors.header("Diagnóstico General del Sistema"))
+        if self.verbose:
+            print(Colors.header("Diagnóstico General del Sistema"))
 
         issues = []
 
@@ -712,20 +909,23 @@ class WebAppManager:
         if nginx_status != "active":
             issues.append("❌ Nginx no está activo")
         else:
-            print(Colors.success("Nginx activo"))
+            if self.verbose:
+                print(Colors.success("Nginx activo"))
 
         # Verificar configuración nginx
         if not self.nginx_service.test_config():
             issues.append("❌ Configuración nginx tiene errores")
         else:
-            print(Colors.success("Configuración nginx válida"))
+            if self.verbose:
+                print(Colors.success("Configuración nginx válida"))
 
         # Verificar espacio en disco
         disk_usage = self.cmd.run("df / | awk 'NR==2{print $5}' | sed 's/%//'", check=False)
         if disk_usage and int(disk_usage) > 90:
             issues.append(f"❌ Poco espacio en disco: {disk_usage}% usado")
         else:
-            print(Colors.success(f"Espacio en disco OK: {disk_usage}% usado"))
+            if self.verbose:
+                print(Colors.success(f"Espacio en disco OK: {disk_usage}% usado"))
 
         # Verificar aplicaciones
         apps = self.config_manager.get_all_apps()
@@ -738,7 +938,8 @@ class WebAppManager:
             for issue in issues:
                 print(f"  {issue}")
         else:
-            print(Colors.success("Sistema funcionando correctamente"))
+            if self.verbose:
+                print(Colors.success("Sistema funcionando correctamente"))
     
     def repair_app(self, domain: str) -> bool:
         """Reparar aplicación con problemas"""

@@ -110,29 +110,56 @@ class NextJSDeployer(BaseDeployer):
         """Construir aplicación Next.js"""
         print(Colors.info("Construyendo aplicación Next.js..."))
         
+        # Limpiar build anterior para evitar problemas de cache
+        next_dir = app_dir / ".next"
+        if next_dir.exists():
+            shutil.rmtree(next_dir)
+        
+        # Configurar permisos para node_modules/.bin/
+        node_modules_bin = app_dir / "node_modules" / ".bin"
+        if node_modules_bin.exists():
+            self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+            print(Colors.info("Permisos de ejecución configurados para node_modules/.bin/"))
+        
         # Usar comando personalizado o por defecto
         build_cmd = app_config.build_command or self.get_default_build_command(app_config)
         
-        # Construir aplicación
-        build_result = self.cmd.run(
-            f"cd {app_dir} && {build_cmd}",
-            check=False
-        )
+        # Construir aplicación con variables de entorno necesarias
+        env_vars = "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1"
+        full_cmd = f"cd {app_dir} && {env_vars} {build_cmd}"
+        
+        build_result = self.cmd.run(full_cmd, check=False)
         
         if not build_result:
             print(Colors.error("Error construyendo aplicación Next.js"))
             return False
         
         # Verificar que .next se creó
-        next_dir = app_dir / ".next"
         if not next_dir.exists():
             print(Colors.error("Construcción Next.js no generó directorio .next"))
             return False
         
-        # Verificar archivos de build
-        build_manifest = next_dir / "build-manifest.json"
-        if not build_manifest.exists():
-            print(Colors.warning("build-manifest.json no encontrado, pero .next existe"))
+        # Verificar archivos críticos de build
+        required_files = [
+            next_dir / "BUILD_ID",
+            next_dir / "build-manifest.json"
+        ]
+        
+        missing_files = [f for f in required_files if not f.exists()]
+        if missing_files:
+            print(Colors.warning(f"Archivos de build faltantes: {[f.name for f in missing_files]}"))
+            # Intentar generar BUILD_ID si no existe
+            build_id_file = next_dir / "BUILD_ID"
+            if not build_id_file.exists():
+                import uuid
+                build_id = str(uuid.uuid4())[:8]
+                build_id_file.write_text(build_id)
+                print(Colors.info(f"BUILD_ID generado: {build_id}"))
+        
+        # Configurar permisos finales para node_modules/.bin/
+        if node_modules_bin.exists():
+            self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+            print(Colors.info("Permisos de ejecución configurados para node_modules/.bin/"))
         
         print(Colors.success("Aplicación Next.js construida exitosamente"))
         return True

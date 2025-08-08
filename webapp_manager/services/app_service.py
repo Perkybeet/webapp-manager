@@ -15,9 +15,11 @@ from ..models import AppConfig
 class AppService:
     """Servicio para gestión de aplicaciones"""
     
-    def __init__(self, apps_dir: Path):
+    def __init__(self, apps_dir: Path, verbose: bool = False, progress_manager=None):
         self.apps_dir = apps_dir
         self.cmd = CommandRunner()
+        self.verbose = verbose
+        self.progress = progress_manager
     
     def deploy_app(self, app_config: AppConfig) -> bool:
         """Desplegar aplicación usando el sistema modular de deployers"""
@@ -106,72 +108,133 @@ class AppService:
             backup_dir = self.apps_dir / f"{domain}_backup"
 
             if not app_config.source.startswith(("http", "git@")):
-                print(Colors.error("Solo se pueden actualizar aplicaciones desde repositorios git"))
+                if self.progress:
+                    self.progress.error("Solo se pueden actualizar aplicaciones desde repositorios git")
+                else:
+                    print(Colors.error("Solo se pueden actualizar aplicaciones desde repositorios git"))
                 return False
 
             if not app_dir.exists():
-                print(Colors.error(f"Directorio de aplicación no existe: {app_dir}"))
+                if self.progress:
+                    self.progress.error(f"Directorio de aplicación no existe: {app_dir}")
+                else:
+                    print(Colors.error(f"Directorio de aplicación no existe: {app_dir}"))
                 return False
 
-            print(Colors.step(1, 6, "Creando backup"))
-            # Crear backup como copia (no mover)
-            if backup_dir.exists():
-                shutil.rmtree(backup_dir)
-            shutil.copytree(app_dir, backup_dir)
-            print(Colors.success(f"Backup creado en {backup_dir}"))
+            if self.progress:
+                with self.progress.task("Actualizando código y reconstruyendo", total=6) as task_id:
+                    # Paso 1: Crear backup
+                    self.progress.update(task_id, advance=1, description="Creando backup")
+                    if backup_dir.exists():
+                        shutil.rmtree(backup_dir)
+                    shutil.copytree(app_dir, backup_dir)
+                    self.progress.log(f"Backup creado en {backup_dir}")
 
-            print(Colors.step(2, 6, "Configurando permisos para Git"))
-            # Cambiar permisos a root para operaciones Git
-            self.cmd.run_sudo(f"chown -R root:root {app_dir}")
-            self._configure_git_safe_directory(app_dir)
+                    # Paso 2: Configurar permisos para Git
+                    self.progress.update(task_id, advance=1, description="Configurando permisos para Git")
+                    self.cmd.run_sudo(f"chown -R root:root {app_dir}")
+                    self._configure_git_safe_directory(app_dir)
+                    
+                    try:
+                        git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
+                        self.progress.log("Verificación de Git completada")
+                    except Exception as e:
+                        self.progress.warning(f"Advertencia en verificación Git: {e}")
+
+                    # Paso 3: Actualizar código
+                    self.progress.update(task_id, advance=1, description="Actualizando código")
+                    try:
+                        fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
+                        self.progress.log("Git fetch completado")
+                    except Exception as e:
+                        self.progress.error(f"Error haciendo git fetch: {e}")
+                        self._restore_from_backup(domain, app_dir, backup_dir)
+                        return False
+
+                    try:
+                        pull_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{app_config.branch}")
+                        self.progress.log("Código actualizado")
+                    except Exception as e:
+                        self.progress.error(f"Error actualizando código: {e}")
+                        self._restore_from_backup(domain, app_dir, backup_dir)
+                        return False
+
+                    # Paso 4: Reconstruir aplicación
+                    self.progress.update(task_id, advance=1, description="Reconstruyendo aplicación")
+                    self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
+                    
+                    if not self._rebuild_application(app_dir, app_config):
+                        self.progress.error("Error reconstruyendo aplicación")
+                        self._restore_from_backup(domain, app_dir, backup_dir)
+                        return False
+
+                    # Paso 5: Configurar permisos finales
+                    self.progress.update(task_id, advance=1, description="Configurando permisos finales")
+                    self._set_permissions(app_dir)
+
+                    # Paso 6: Limpiar backup
+                    self.progress.update(task_id, advance=1, description="Limpiando backup")
+                    if backup_dir.exists():
+                        shutil.rmtree(backup_dir)
+            else:
+                # Modo verbose: usar el sistema de pasos original
+                print(Colors.step(1, 6, "Creando backup"))
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+                shutil.copytree(app_dir, backup_dir)
+                print(Colors.success(f"Backup creado en {backup_dir}"))
+
+                print(Colors.step(2, 6, "Configurando permisos para Git"))
+                self.cmd.run_sudo(f"chown -R root:root {app_dir}")
+                self._configure_git_safe_directory(app_dir)
+                
+                try:
+                    git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
+                    print(Colors.info("Verificación de Git completada"))
+                except Exception as e:
+                    print(Colors.warning(f"Advertencia en verificación Git: {e}"))
+
+                print(Colors.step(3, 6, "Actualizando código"))
+                try:
+                    fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
+                    print(Colors.success("Git fetch completado"))
+                except Exception as e:
+                    print(Colors.error(f"Error haciendo git fetch: {e}"))
+                    self._restore_from_backup(domain, app_dir, backup_dir)
+                    return False
+
+                try:
+                    pull_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{app_config.branch}")
+                    print(Colors.success("Código actualizado"))
+                except Exception as e:
+                    print(Colors.error(f"Error actualizando código: {e}"))
+                    self._restore_from_backup(domain, app_dir, backup_dir)
+                    return False
+
+                print(Colors.step(4, 6, "Reconstruyendo aplicación"))
+                self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
+                
+                if not self._rebuild_application(app_dir, app_config):
+                    print(Colors.error("Error reconstruyendo aplicación"))
+                    self._restore_from_backup(domain, app_dir, backup_dir)
+                    return False
+
+                print(Colors.step(5, 6, "Configurando permisos finales"))
+                self._set_permissions(app_dir)
+
+                print(Colors.step(6, 6, "Limpiando backup"))
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+
+                print(Colors.success(f"Aplicación {domain} actualizada exitosamente"))
             
-            # Verificar que el directorio Git está en buen estado
-            try:
-                git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
-                print(Colors.info("Verificación de Git completada"))
-            except Exception as e:
-                print(Colors.warning(f"Advertencia en verificación Git: {e}"))
-
-            print(Colors.step(3, 6, "Actualizando código"))
-            # Hacer fetch y pull del código más reciente (sin sudo porque cd no funciona con sudo)
-            try:
-                fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
-                print(Colors.success("Git fetch completado"))
-            except Exception as e:
-                print(Colors.error(f"Error haciendo git fetch: {e}"))
-                self._restore_from_backup(domain, app_dir, backup_dir)
-                return False
-
-            try:
-                pull_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{app_config.branch}")
-                print(Colors.success("Código actualizado"))
-            except Exception as e:
-                print(Colors.error(f"Error actualizando código: {e}"))
-                self._restore_from_backup(domain, app_dir, backup_dir)
-                return False
-
-            print(Colors.step(4, 6, "Reconstruyendo aplicación"))
-            # Cambiar permisos a www-data para build
-            self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
-            
-            if not self._rebuild_application(app_dir, app_config):
-                print(Colors.error("Error reconstruyendo aplicación"))
-                self._restore_from_backup(domain, app_dir, backup_dir)
-                return False
-
-            print(Colors.step(5, 6, "Configurando permisos finales"))
-            self._set_permissions(app_dir)
-
-            print(Colors.step(6, 6, "Limpiando backup"))
-            # Si todo salió bien, eliminar backup
-            if backup_dir.exists():
-                shutil.rmtree(backup_dir)
-
-            print(Colors.success(f"Aplicación {domain} actualizada exitosamente"))
             return True
 
         except Exception as e:
-            print(Colors.error(f"Error actualizando aplicación: {e}"))
+            if self.progress:
+                self.progress.error(f"Error actualizando aplicación: {e}")
+            else:
+                print(Colors.error(f"Error actualizando aplicación: {e}"))
             self._restore_from_backup(domain, app_dir, backup_dir)
             return False
 
