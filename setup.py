@@ -34,7 +34,7 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        # No external dependencies - uses only Python standard library
+        "rich>=13.0.0",
     ],
     extras_require={
         "dev": [

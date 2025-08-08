@@ -983,3 +983,20 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         """Comando fix-config"""
         self._show_info("Función fix-config no implementada todavía")
         return True
+
+
+def main():
+    """Función de entrada principal para el comando webapp-manager"""
+    try:
+        cli = CLI()
+        cli.run()
+    except KeyboardInterrupt:
+        print("\n⚠️  Operación cancelada por el usuario")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error inesperado: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
