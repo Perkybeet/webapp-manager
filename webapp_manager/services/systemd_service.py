@@ -14,10 +14,11 @@ from ..models import AppConfig
 class SystemdService:
     """Servicio para gestión de systemd"""
     
-    def __init__(self, systemd_dir: Path, apps_dir: Path):
+    def __init__(self, systemd_dir: Path, apps_dir: Path, verbose: bool = False):
         self.systemd_dir = systemd_dir
         self.apps_dir = apps_dir
-        self.cmd = CommandRunner()
+        self.verbose = verbose
+        self.cmd = CommandRunner
     
     def create_service(self, app_config: AppConfig, env_vars: Optional[Dict[str, str]] = None) -> bool:
         """Crear servicio systemd para aplicación"""

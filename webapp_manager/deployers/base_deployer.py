@@ -15,7 +15,7 @@ class BaseDeployer(ABC):
     
     def __init__(self, apps_dir: str, cmd_service=None):
         self.apps_dir = Path(apps_dir)
-        self.cmd = cmd_service or CommandRunner()
+        self.cmd = cmd_service or CommandRunner
         self.app_type = self.get_app_type()
     
     @abstractmethod

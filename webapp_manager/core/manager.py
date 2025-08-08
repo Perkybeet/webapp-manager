@@ -58,7 +58,7 @@ class WebAppManager:
         )
         
         # Utilidades
-        self.cmd = CommandRunner(verbose=verbose)
+        self.cmd = CommandRunner
         
         # Inicializar sistema
         self._ensure_directories()

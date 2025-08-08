@@ -17,7 +17,7 @@ class AppService:
     
     def __init__(self, apps_dir: Path, verbose: bool = False, progress_manager=None):
         self.apps_dir = apps_dir
-        self.cmd = CommandRunner()
+        self.cmd = CommandRunner
         self.verbose = verbose
         self.progress = progress_manager
     

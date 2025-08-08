@@ -14,11 +14,12 @@ from ..models import AppConfig
 class NginxService:
     """Servicio para gestión de nginx"""
     
-    def __init__(self, nginx_sites_path: Path, nginx_enabled_path: Path, nginx_conf_path: Path):
+    def __init__(self, nginx_sites_path: Path, nginx_enabled_path: Path, nginx_conf_path: Path, verbose: bool = False):
         self.nginx_sites = nginx_sites_path
         self.nginx_enabled = nginx_enabled_path
         self.nginx_conf = nginx_conf_path
-        self.cmd = CommandRunner()
+        self.verbose = verbose
+        self.cmd = CommandRunner
     
     def create_config(self, app_config: AppConfig) -> bool:
         """Crear configuración nginx para aplicación"""
