@@ -176,21 +176,17 @@ class AppService:
 
                     # Paso 3: Actualizar código
                     self.progress.update(task_id, advance=1, description="Actualizando código")
-                    try:
-                        fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
-                        self.progress.log("Git fetch completado")
-                    except Exception as e:
-                        self.progress.error(f"Error haciendo git fetch: {e}")
+                    update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
+                    
+                    if not update_success:
+                        self.progress.error("Error actualizando código - ninguna rama válida encontrada")
                         self._restore_from_backup(domain, app_dir, backup_dir)
                         return False
-
-                    try:
-                        pull_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{app_config.branch}")
-                        self.progress.log("Código actualizado")
-                    except Exception as e:
-                        self.progress.error(f"Error actualizando código: {e}")
-                        self._restore_from_backup(domain, app_dir, backup_dir)
-                        return False
+                    
+                    if used_branch != app_config.branch:
+                        self.progress.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'")
+                    
+                    self.progress.log("Código actualizado exitosamente")
 
                     # Paso 4: Reconstruir aplicación
                     self.progress.update(task_id, advance=1, description="Reconstruyendo aplicación")
@@ -228,21 +224,17 @@ class AppService:
                     print(Colors.warning(f"Advertencia en verificación Git: {e}"))
 
                 print(Colors.step(3, 6, "Actualizando código"))
-                try:
-                    fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
-                    print(Colors.success("Git fetch completado"))
-                except Exception as e:
-                    print(Colors.error(f"Error haciendo git fetch: {e}"))
+                update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
+                
+                if not update_success:
+                    print(Colors.error("Error actualizando código - ninguna rama válida encontrada"))
                     self._restore_from_backup(domain, app_dir, backup_dir)
                     return False
-
-                try:
-                    pull_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{app_config.branch}")
-                    print(Colors.success("Código actualizado"))
-                except Exception as e:
-                    print(Colors.error(f"Error actualizando código: {e}"))
-                    self._restore_from_backup(domain, app_dir, backup_dir)
-                    return False
+                
+                if used_branch != app_config.branch:
+                    print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
+                
+                print(Colors.success("Código actualizado exitosamente"))
 
                 print(Colors.step(4, 6, "Reconstruyendo aplicación"))
                 self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
@@ -305,30 +297,138 @@ class AppService:
             print(Colors.warning(f"Error probando conectividad: {e}"))
             return False
 
+    def _try_clone_with_branch_fallback(self, url: str, target_dir: Path, preferred_branch: str) -> tuple[bool, str]:
+        """
+        Intentar clonar con fallback de ramas
+        
+        Args:
+            url: URL del repositorio (SSH o HTTPS)
+            target_dir: Directorio destino
+            preferred_branch: Rama preferida a intentar primero
+            
+        Returns:
+            tuple[bool, str]: (éxito, rama_usada)
+        """
+        # Lista de ramas a intentar en orden de preferencia
+        branches_to_try = [preferred_branch]
+        
+        # Añadir ramas comunes si no están ya en la lista
+        common_branches = ["main", "master", "develop", "dev"]
+        for branch in common_branches:
+            if branch not in branches_to_try:
+                branches_to_try.append(branch)
+        
+        if self.verbose:
+            print(Colors.info(f"🌿 Ramas a intentar: {', '.join(branches_to_try)}"))
+        
+        for branch in branches_to_try:
+            if self.verbose:
+                print(Colors.info(f"🔄 Intentando con rama: {branch}"))
+            
+            # Limpiar directorio si existe de intentos anteriores
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            
+            clone_result = self.cmd.run(
+                f"git clone --depth 1 --branch {branch} {url} {target_dir}",
+                check=False,
+            )
+            
+            if clone_result is not None and target_dir.exists():
+                if self.verbose:
+                    print(Colors.success(f"✅ Clonado exitoso con rama: {branch}"))
+                return True, branch
+            elif self.verbose:
+                print(Colors.warning(f"⚠️  Rama '{branch}' no encontrada, probando siguiente..."))
+        
+        return False, ""
+
+    def _update_git_with_branch_fallback(self, app_dir: Path, preferred_branch: str) -> tuple[bool, str]:
+        """
+        Actualizar repositorio Git con fallback de ramas
+        
+        Args:
+            app_dir: Directorio de la aplicación
+            preferred_branch: Rama preferida a intentar primero
+            
+        Returns:
+            tuple[bool, str]: (éxito, rama_usada)
+        """
+        # Lista de ramas a intentar en orden de preferencia
+        branches_to_try = [preferred_branch]
+        
+        # Añadir ramas comunes si no están ya en la lista
+        common_branches = ["main", "master", "develop", "dev"]
+        for branch in common_branches:
+            if branch not in branches_to_try:
+                branches_to_try.append(branch)
+        
+        if self.verbose:
+            print(Colors.info(f"🌿 Ramas a intentar para actualización: {', '.join(branches_to_try)}"))
+        
+        # Primero hacer fetch general
+        try:
+            fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
+            if self.verbose:
+                print(Colors.success("✅ Git fetch completado"))
+        except Exception as e:
+            if self.verbose:
+                print(Colors.error(f"❌ Error haciendo git fetch: {e}"))
+            return False, ""
+        
+        # Intentar con cada rama
+        for branch in branches_to_try:
+            if self.verbose:
+                print(Colors.info(f"🔄 Intentando actualizar con rama: {branch}"))
+            
+            try:
+                # Verificar si la rama existe en el remoto
+                check_result = self.cmd.run(
+                    f"cd {app_dir} && git ls-remote --heads origin {branch}",
+                    check=False
+                )
+                
+                if not check_result:
+                    if self.verbose:
+                        print(Colors.warning(f"⚠️  Rama '{branch}' no existe en el remoto"))
+                    continue
+                
+                # Intentar hacer reset hard a esa rama
+                reset_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{branch}")
+                
+                if reset_result is not None:
+                    if self.verbose:
+                        print(Colors.success(f"✅ Actualización exitosa con rama: {branch}"))
+                    return True, branch
+                    
+            except Exception as e:
+                if self.verbose:
+                    print(Colors.warning(f"⚠️  Error con rama '{branch}': {e}"))
+                continue
+        
+        return False, ""
+
     def _get_source_code(self, source: str, branch: str, target_dir: Path) -> bool:
         """Obtener código fuente"""
         try:
             if source.startswith(("http", "git@")):
                 if self.verbose:
                     print(Colors.info(f"🔄 Clonando repositorio: {source}"))
-                    print(Colors.info(f"🌿 Rama: {branch}"))
+                    print(Colors.info(f"🌿 Rama preferida: {branch}"))
                     print(Colors.info(f"📁 Destino: {target_dir}"))
                 else:
                     print(Colors.info(f"Clonando repositorio: {source}"))
                 
                 # Intentar clonar primero con SSH si es una URL SSH
                 clone_success = False
+                used_branch = branch
                 
                 if source.startswith("git@"):
                     # Para URLs SSH, intentar primero con SSH
                     if self.verbose:
                         print(Colors.info("🔑 Intentando clonado SSH..."))
                     
-                    clone_result = self.cmd.run(
-                        f"git clone --depth 1 --branch {branch} {source} {target_dir}",
-                        check=False,
-                    )
-                    clone_success = clone_result is not None and target_dir.exists()
+                    clone_success, used_branch = self._try_clone_with_branch_fallback(source, target_dir, branch)
                     
                     if not clone_success:
                         # Convertir SSH a HTTPS y reintentar
@@ -338,33 +438,21 @@ class AppService:
                                 print(Colors.warning("🔄 SSH falló, intentando con HTTPS..."))
                                 print(Colors.info(f"🌐 URL HTTPS: {https_url}"))
                             
-                            # Limpiar directorio parcial si existe
-                            if target_dir.exists():
-                                shutil.rmtree(target_dir)
-                            
-                            clone_result = self.cmd.run(
-                                f"git clone --depth 1 --branch {branch} {https_url} {target_dir}",
-                                check=False,
-                            )
-                            clone_success = clone_result is not None and target_dir.exists()
+                            clone_success, used_branch = self._try_clone_with_branch_fallback(https_url, target_dir, branch)
                 
                 else:
                     # Para URLs HTTPS
                     if self.verbose:
                         print(Colors.info("🌐 Clonando via HTTPS..."))
                     
-                    clone_result = self.cmd.run(
-                        f"git clone --depth 1 --branch {branch} {source} {target_dir}",
-                        check=False,
-                    )
-                    clone_success = clone_result is not None and target_dir.exists()
+                    clone_success, used_branch = self._try_clone_with_branch_fallback(source, target_dir, branch)
                 
                 if not clone_success:
                     print(Colors.error(f"❌ Error clonando repositorio: {source}"))
                     if self.verbose:
                         print(Colors.error("💡 Posibles causas:"))
                         print(Colors.error("   • Repositorio privado sin acceso"))
-                        print(Colors.error("   • Rama especificada no existe"))
+                        print(Colors.error("   • Ninguna de las ramas comunes existe (main, master, develop, dev)"))
                         print(Colors.error("   • Problemas de red"))
                         print(Colors.error("   • Credenciales SSH no configuradas"))
                     return False
@@ -372,6 +460,8 @@ class AppService:
                 if target_dir.exists():
                     self._configure_git_safe_directory(target_dir)
                     if self.verbose:
+                        if used_branch != branch:
+                            print(Colors.warning(f"⚠️  Nota: Se usó la rama '{used_branch}' en lugar de '{branch}'"))
                         print(Colors.success("✅ Repositorio clonado exitosamente"))
             else:
                 if not Path(source).exists():
