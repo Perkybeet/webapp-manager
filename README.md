@@ -17,6 +17,9 @@ Sistema completo de gestión de aplicaciones web con nginx proxy reverso, interf
 - **📊 Monitoreo integrado**: Logs, diagnósticos, reparación automática
 - **💾 Backup automático**: Respaldo antes de actualizaciones
 - **🖥️ Interfaz dual**: CLI tradicional + GUI terminal con Dialog
+- **🔍 Modo Verbose**: Seguimiento detallado de comandos en tiempo real
+- **🔄 Clonado Inteligente**: Fallback automático SSH → HTTPS para repositorios
+- **🛡️ Progreso Robusto**: Barras de progreso que se recuperan de errores
 
 ## 📋 Uso Rápido
 
@@ -113,6 +116,33 @@ webapp-manager logs --domain app.ejemplo.com --follow
 
 # Remover aplicación
 webapp-manager remove --domain app.ejemplo.com
+```
+
+### Modo Verbose para Debugging
+
+```bash
+# Usar modo verbose para ver todos los comandos ejecutados
+webapp-manager add --domain app.com --source git@github.com:user/repo.git --port 3000 --verbose
+
+# Forma corta
+webapp-manager add --domain app.com --source /path/app --port 3000 -v
+
+# Útil para debugging cuando hay problemas
+webapp-manager update --domain app.com --verbose
+webapp-manager repair --domain app.com --verbose
+```
+
+### Clonado Inteligente de Repositorios
+
+```bash
+# El sistema automáticamente prueba SSH primero, luego HTTPS si falla
+webapp-manager add --domain app.com --source git@github.com:user/repo.git --port 3000
+
+# También funciona directamente con HTTPS
+webapp-manager add --domain app.com --source https://github.com/user/repo.git --port 3000
+
+# Repositorios privados (requiere configuración SSH o token)
+webapp-manager add --domain app.com --source git@github.com:company/private-repo.git --port 3000 --verbose
 ```
 
 ### Diagnóstico y reparación

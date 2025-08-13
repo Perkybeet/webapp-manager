@@ -90,12 +90,31 @@ class CLI:
         # Ejecutar comando
         try:
             success = self._execute_command(args, env_vars)
+            
+            # Limpiar progreso antes de salir
+            if hasattr(self, 'progress_manager') and self.progress_manager:
+                self.progress_manager.stop()
+            
             sys.exit(0 if success else 1)
         except KeyboardInterrupt:
-            self._show_warning("\nOperación cancelada por el usuario")
+            self._show_warning("\n⚠️  Operación cancelada por el usuario")
+            
+            # Limpiar progreso en caso de interrupción
+            if hasattr(self, 'progress_manager') and self.progress_manager:
+                self.progress_manager.force_cleanup()
+            
             sys.exit(1)
         except Exception as e:
             self._show_error(f"Error inesperado: {e}")
+            
+            # Limpiar progreso en caso de error
+            if hasattr(self, 'progress_manager') and self.progress_manager:
+                self.progress_manager.force_cleanup()
+            
+            if self.verbose:
+                import traceback
+                self.console.print(f"[dim]Detalles del error:\n{traceback.format_exc()}[/dim]")
+            
             sys.exit(1)
     
     def _show_banner(self):

@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 
 from ..config import ConfigManager
 from ..models import AppConfig, GlobalConfig, SystemPaths
-from ..services import AppService, NginxService, SystemdService
+from ..services import AppService, NginxService, SystemdService, CmdService
 from ..utils import Colors, CommandRunner, Validators, ProgressManager
 
 # Configurar logging con manejo de errores
@@ -58,7 +58,7 @@ class WebAppManager:
         )
         
         # Utilidades
-        self.cmd = CommandRunner
+        self.cmd = CmdService(verbose=verbose)
         
         # Inicializar sistema
         self._ensure_directories()

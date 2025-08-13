@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 
 from ..utils import CommandRunner, Colors, Validators
 from ..models import AppConfig
+from .cmd_service import CmdService
 
 
 class AppService:
@@ -17,7 +18,7 @@ class AppService:
     
     def __init__(self, apps_dir: Path, verbose: bool = False, progress_manager=None):
         self.apps_dir = apps_dir
-        self.cmd = CommandRunner
+        self.cmd = CmdService(verbose=verbose)
         self.verbose = verbose
         self.progress = progress_manager
     
@@ -36,18 +37,31 @@ class AppService:
 
             # Backup si existe
             if app_dir.exists():
-                print(Colors.info("Creando backup de aplicación existente..."))
+                if self.verbose:
+                    print(Colors.info("💾 Creando backup de aplicación existente..."))
+                else:
+                    print(Colors.info("Creando backup de aplicación existente..."))
+                    
                 backup_dir = self.apps_dir / f"{app_config.domain}_backup"
                 if backup_dir.exists():
                     shutil.rmtree(backup_dir)
                 shutil.copytree(app_dir, backup_dir)
+                
+                if self.verbose:
+                    print(Colors.success(f"✅ Backup creado en: {backup_dir}"))
 
-            print(Colors.step(2, 6, "Obteniendo código fuente"))
+            if self.verbose:
+                print(Colors.step(2, 6, "📥 Obteniendo código fuente"))
+            else:
+                print(Colors.step(2, 6, "Obteniendo código fuente"))
 
             if not self._get_source_code(app_config.source, app_config.branch, temp_dir):
                 return False
 
-            print(Colors.step(3, 6, "Validando estructura con deployer modular"))
+            if self.verbose:
+                print(Colors.step(3, 6, "🔍 Validando estructura con deployer modular"))
+            else:
+                print(Colors.step(3, 6, "Validando estructura con deployer modular"))
             
             # Crear deployer específico
             deployer = DeployerFactory.create_deployer(app_config.app_type, str(self.apps_dir), self.cmd)
@@ -58,12 +72,19 @@ class AppService:
                     shutil.rmtree(temp_dir)
                 return False
 
-            print(Colors.step(4, 6, "Verificando requerimientos del sistema"))
+            if self.verbose:
+                print(Colors.step(4, 6, "⚙️  Verificando requerimientos del sistema"))
+            else:
+                print(Colors.step(4, 6, "Verificando requerimientos del sistema"))
+                
             if not deployer.check_requirements():
                 print(Colors.error("Requerimientos del sistema no cumplidos"))
                 return False
 
-            print(Colors.step(5, 6, "Instalando dependencias y construyendo"))
+            if self.verbose:
+                print(Colors.step(5, 6, "🔨 Instalando dependencias y construyendo"))
+            else:
+                print(Colors.step(5, 6, "Instalando dependencias y construyendo"))
             
             # Instalar dependencias
             if not deployer.install_dependencies(temp_dir, app_config):
@@ -84,7 +105,11 @@ class AppService:
                 if not deployer.handle_environment_file(temp_dir, app_config):
                     print(Colors.warning("Error configurando archivo .env"))
 
-            print(Colors.step(6, 6, "Finalizando despliegue"))
+            if self.verbose:
+                print(Colors.step(6, 6, "🎯 Finalizando despliegue"))
+            else:
+                print(Colors.step(6, 6, "Finalizando despliegue"))
+                
             if not self._finalize_deployment(app_dir, temp_dir):
                 return False
 
@@ -92,12 +117,20 @@ class AppService:
             backup_dir = self.apps_dir / f"{app_config.domain}_backup"
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
+                if self.verbose:
+                    print(Colors.info("🗑️  Backup temporal eliminado"))
 
-            print(Colors.success(f"Aplicación desplegada en {app_dir}"))
+            if self.verbose:
+                print(Colors.success(f"🎉 Aplicación desplegada exitosamente en {app_dir}"))
+            else:
+                print(Colors.success(f"Aplicación desplegada en {app_dir}"))
             return True
 
         except Exception as e:
             print(Colors.error(f"Error en despliegue: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"🔍 Detalles del error:\n{traceback.format_exc()}"))
             self._cleanup_failed_deployment(app_config.domain, temp_dir)
             return False
 
@@ -276,29 +309,93 @@ class AppService:
         """Obtener código fuente"""
         try:
             if source.startswith(("http", "git@")):
-                print(Colors.info(f"Clonando repositorio: {source}"))
-                clone_result = self.cmd.run(
-                    f"git clone --depth 1 --branch {branch} {source} {target_dir}",
-                    check=False,
-                )
-                if not clone_result and not target_dir.exists():
-                    print(Colors.error(f"Error clonando repositorio: {source}"))
+                if self.verbose:
+                    print(Colors.info(f"🔄 Clonando repositorio: {source}"))
+                    print(Colors.info(f"🌿 Rama: {branch}"))
+                    print(Colors.info(f"📁 Destino: {target_dir}"))
+                else:
+                    print(Colors.info(f"Clonando repositorio: {source}"))
+                
+                # Intentar clonar primero con SSH si es una URL SSH
+                clone_success = False
+                
+                if source.startswith("git@"):
+                    # Para URLs SSH, intentar primero con SSH
+                    if self.verbose:
+                        print(Colors.info("🔑 Intentando clonado SSH..."))
+                    
+                    clone_result = self.cmd.run(
+                        f"git clone --depth 1 --branch {branch} {source} {target_dir}",
+                        check=False,
+                    )
+                    clone_success = clone_result is not None and target_dir.exists()
+                    
+                    if not clone_success:
+                        # Convertir SSH a HTTPS y reintentar
+                        if "github.com" in source:
+                            https_url = source.replace("git@github.com:", "https://github.com/")
+                            if self.verbose:
+                                print(Colors.warning("🔄 SSH falló, intentando con HTTPS..."))
+                                print(Colors.info(f"🌐 URL HTTPS: {https_url}"))
+                            
+                            # Limpiar directorio parcial si existe
+                            if target_dir.exists():
+                                shutil.rmtree(target_dir)
+                            
+                            clone_result = self.cmd.run(
+                                f"git clone --depth 1 --branch {branch} {https_url} {target_dir}",
+                                check=False,
+                            )
+                            clone_success = clone_result is not None and target_dir.exists()
+                
+                else:
+                    # Para URLs HTTPS
+                    if self.verbose:
+                        print(Colors.info("🌐 Clonando via HTTPS..."))
+                    
+                    clone_result = self.cmd.run(
+                        f"git clone --depth 1 --branch {branch} {source} {target_dir}",
+                        check=False,
+                    )
+                    clone_success = clone_result is not None and target_dir.exists()
+                
+                if not clone_success:
+                    print(Colors.error(f"❌ Error clonando repositorio: {source}"))
+                    if self.verbose:
+                        print(Colors.error("💡 Posibles causas:"))
+                        print(Colors.error("   • Repositorio privado sin acceso"))
+                        print(Colors.error("   • Rama especificada no existe"))
+                        print(Colors.error("   • Problemas de red"))
+                        print(Colors.error("   • Credenciales SSH no configuradas"))
                     return False
 
                 if target_dir.exists():
                     self._configure_git_safe_directory(target_dir)
+                    if self.verbose:
+                        print(Colors.success("✅ Repositorio clonado exitosamente"))
             else:
                 if not Path(source).exists():
                     print(Colors.error(f"Directorio fuente no existe: {source}"))
                     return False
 
-                print(Colors.info(f"Copiando desde: {source}"))
+                if self.verbose:
+                    print(Colors.info(f"📂 Copiando desde directorio local: {source}"))
+                    print(Colors.info(f"📁 Destino: {target_dir}"))
+                else:
+                    print(Colors.info(f"Copiando desde: {source}"))
+                
                 shutil.copytree(source, target_dir)
+                
+                if self.verbose:
+                    print(Colors.success("✅ Código copiado exitosamente"))
 
             return True
 
         except Exception as e:
             print(Colors.error(f"Error obteniendo código fuente: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"🔍 Detalles del error:\n{traceback.format_exc()}"))
             return False
 
     def _validate_app_structure(self, app_dir: Path, app_type: str) -> bool:
@@ -642,6 +739,9 @@ class AppService:
     def _configure_git_safe_directory(self, directory: Path):
         """Configurar directorio como seguro para Git"""
         try:
+            if self.verbose:
+                print(Colors.info(f"🔧 Configurando directorio Git seguro: {directory}"))
+            
             # Configurar directorio como seguro para Git (sin sudo porque ya somos root)
             result = self.cmd.run(
                 f"git config --global --get-all safe.directory | grep -x {directory}",
@@ -650,12 +750,23 @@ class AppService:
 
             if not result or str(directory) not in result:
                 self.cmd.run(f"git config --global --add safe.directory {directory}")
-                print(Colors.info(f"Directorio {directory} configurado como seguro para Git"))
+                if self.verbose:
+                    print(Colors.success(f"✅ Directorio {directory} configurado como seguro para Git"))
+                else:
+                    print(Colors.info(f"Directorio {directory} configurado como seguro para Git"))
             else:
-                print(Colors.info(f"Directorio {directory} ya está configurado como seguro para Git"))
+                if self.verbose:
+                    print(Colors.info(f"ℹ️  Directorio {directory} ya está configurado como seguro para Git"))
+                else:
+                    print(Colors.info(f"Directorio {directory} ya está configurado como seguro para Git"))
 
         except Exception as e:
-            print(Colors.warning(f"Error configurando directorio Git seguro: {e}"))
+            if self.verbose:
+                print(Colors.warning(f"❌ Error configurando directorio Git seguro: {e}"))
+                import traceback
+                print(Colors.warning(f"🔍 Detalles: {traceback.format_exc()}"))
+            else:
+                print(Colors.warning(f"Error configurando directorio Git seguro: {e}"))
 
     def _restore_from_backup(self, domain: str, app_dir: Path, backup_dir: Path):
         """Restaurar aplicación desde backup en caso de error"""

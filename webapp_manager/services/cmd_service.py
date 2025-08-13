@@ -11,8 +11,9 @@ from typing import Optional
 class CmdService:
     """Servicio para ejecutar comandos del sistema"""
     
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         self.encoding = 'utf-8'
+        self.verbose = verbose
     
     def run(self, command: str, check: bool = True, timeout: Optional[int] = None) -> Optional[str]:
         """
@@ -26,6 +27,9 @@ class CmdService:
         Returns:
             Salida del comando o None si falló
         """
+        if self.verbose:
+            print(f"🔧 Ejecutando: {command}")
+        
         try:
             result = subprocess.run(
                 command,
@@ -37,16 +41,54 @@ class CmdService:
                 check=check
             )
             
-            return result.stdout.strip() if result.stdout else ""
+            output = result.stdout.strip() if result.stdout else ""
+            
+            if self.verbose:
+                if output:
+                    print(f"📤 Salida: {output}")
+                if result.stderr:
+                    print(f"⚠️  Error: {result.stderr}")
+            
+            return output
             
         except subprocess.CalledProcessError as e:
+            if self.verbose:
+                print(f"❌ Error ejecutando comando: {command}")
+                print(f"📊 Código de salida: {e.returncode}")
+                if e.stderr:
+                    print(f"⚠️  STDERR: {e.stderr}")
+            
             if check:
                 return None
             return e.stdout.strip() if e.stdout else ""
         except subprocess.TimeoutExpired:
+            if self.verbose:
+                print(f"⏰ Timeout ejecutando comando: {command}")
             return None
-        except Exception:
+        except Exception as e:
+            if self.verbose:
+                print(f"💥 Excepción ejecutando comando: {e}")
             return None
+    
+    def run_sudo(self, command: str, check: bool = True, timeout: Optional[int] = None) -> Optional[str]:
+        """
+        Ejecutar comando con sudo (solo en sistemas Unix)
+        
+        Args:
+            command: Comando a ejecutar
+            check: Si debe lanzar excepción en caso de error
+            timeout: Timeout en segundos
+            
+        Returns:
+            Salida del comando o None si falló
+        """
+        if os.name == 'nt':  # Windows
+            # En Windows ejecutar sin sudo
+            return self.run(command, check, timeout)
+        else:
+            # En Unix/Linux usar sudo
+            sudo_command = f"sudo {command}"
+            return self.run(sudo_command, check, timeout)
     
     def run_interactive(self, command: str) -> int:
         """

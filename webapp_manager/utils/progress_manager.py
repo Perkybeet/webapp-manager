@@ -50,12 +50,41 @@ class ProgressManager:
     
     def stop(self):
         """Detener el sistema de progreso"""
-        if self.live:
-            self.live.stop()
-            self.live = None
+        try:
+            if self.live:
+                self.live.stop()
+                self.live = None
+        except Exception:
+            # Si hay error deteniendo, simplemente continuar
+            pass
+        
         self.progress = None
         self.tasks.clear()
         self.log_buffer.clear()
+    
+    def force_cleanup(self):
+        """Forzar limpieza del progreso en caso de error"""
+        try:
+            # Limpiar todas las tareas activas
+            if self.progress:
+                for task_id in list(self.tasks.values()):
+                    try:
+                        self.progress.remove_task(task_id)
+                    except Exception:
+                        pass
+            
+            # Detener el live display
+            self.stop()
+            
+            # Limpiar la consola si es necesario
+            self.console.print("\n[dim]Sistema de progreso reiniciado[/dim]")
+            
+        except Exception:
+            # Si todo falla, al menos limpiar las variables
+            self.progress = None
+            self.live = None
+            self.tasks.clear()
+            self.log_buffer.clear()
     
     @contextmanager
     def task(self, description: str, total: Optional[int] = None):
@@ -75,11 +104,23 @@ class ProgressManager:
                 self.tasks[description] = task_id
                 yield task_id
                 
+        except KeyboardInterrupt:
+            # Manejar interrupción del usuario
+            self.console.print("\n[bold red]⚠️  Operación cancelada por el usuario[/bold red]")
+            raise
+        except Exception as e:
+            # Manejar errores
+            self.console.print(f"\n[bold red]❌ Error: {e}[/bold red]")
+            raise
         finally:
-            # Limpiar tarea
+            # Limpiar tarea - SIEMPRE se ejecuta
             if task_id is not None and self.progress:
-                self.progress.update(task_id, completed=total or 100)
-                self.progress.remove_task(task_id)
+                try:
+                    self.progress.update(task_id, completed=total or 100)
+                    self.progress.remove_task(task_id)
+                except Exception:
+                    # Si hay error removiendo la tarea, simplemente continuar
+                    pass
             
             if description in self.tasks:
                 del self.tasks[description]

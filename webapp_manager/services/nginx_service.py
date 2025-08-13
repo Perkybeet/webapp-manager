@@ -9,6 +9,7 @@ from typing import Optional
 
 from ..utils import CommandRunner, Colors
 from ..models import AppConfig
+from .cmd_service import CmdService
 
 
 class NginxService:
@@ -19,7 +20,7 @@ class NginxService:
         self.nginx_enabled = nginx_enabled_path
         self.nginx_conf = nginx_conf_path
         self.verbose = verbose
-        self.cmd = CommandRunner
+        self.cmd = CmdService(verbose=verbose)
     
     def create_config(self, app_config: AppConfig) -> bool:
         """Crear configuración nginx para aplicación"""

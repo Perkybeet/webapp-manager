@@ -9,6 +9,7 @@ from typing import Dict, Optional
 
 from ..utils import CommandRunner, Colors
 from ..models import AppConfig
+from .cmd_service import CmdService
 
 
 class SystemdService:
@@ -18,7 +19,7 @@ class SystemdService:
         self.systemd_dir = systemd_dir
         self.apps_dir = apps_dir
         self.verbose = verbose
-        self.cmd = CommandRunner
+        self.cmd = CmdService(verbose=verbose)
     
     def create_service(self, app_config: AppConfig, env_vars: Optional[Dict[str, str]] = None) -> bool:
         """Crear servicio systemd para aplicación"""
