@@ -90,6 +90,40 @@ class CmdService:
             sudo_command = f"sudo {command}"
             return self.run(sudo_command, check, timeout)
     
+    def test_command_exists(self, command: str) -> bool:
+        """
+        Verificar si un comando existe en el sistema
+        
+        Args:
+            command: Comando a verificar
+            
+        Returns:
+            True si el comando existe
+        """
+        if self.verbose:
+            print(f"🔍 Verificando si existe comando: {command}")
+        
+        try:
+            if os.name == 'nt':  # Windows
+                result = self.run(f"where {command}", check=False)
+            else:  # Unix/Linux
+                result = self.run(f"command -v {command}", check=False)
+            
+            exists = result is not None and result.strip() != ""
+            
+            if self.verbose:
+                if exists:
+                    print(f"✅ Comando '{command}' encontrado: {result}")
+                else:
+                    print(f"❌ Comando '{command}' no encontrado")
+            
+            return exists
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"❌ Error verificando comando '{command}': {e}")
+            return False
+    
     def run_interactive(self, command: str) -> int:
         """
         Ejecutar comando interactivo
@@ -125,34 +159,3 @@ class CmdService:
             )
         except Exception:
             return None
-    
-    def is_command_available(self, command: str) -> bool:
-        """
-        Verificar si un comando está disponible
-        
-        Args:
-            command: Comando a verificar
-            
-        Returns:
-            True si está disponible
-        """
-        try:
-            if os.name == 'nt':  # Windows
-                result = subprocess.run(
-                    f"where {command}",
-                    shell=True,
-                    capture_output=True,
-                    text=True
-                )
-            else:  # Unix/Linux
-                result = subprocess.run(
-                    f"which {command}",
-                    shell=True,
-                    capture_output=True,
-                    text=True
-                )
-            
-            return result.returncode == 0
-            
-        except Exception:
-            return False
