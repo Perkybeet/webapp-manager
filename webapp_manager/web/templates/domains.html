@@ -3,249 +3,330 @@
 {% block title %}Gestión de Dominios - WebApp Manager SAAS{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1 class="h3 mb-0">
-                <i class="fas fa-globe me-2 text-primary"></i>
+<div class="bg-white min-h-screen">
+    <div class="mb-8">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-globe mr-3 text-blue-600"></i>
                 Gestión de Dominios
             </h1>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAppModal">
-                <i class="fas fa-plus me-2"></i>Nueva Aplicación
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl" 
+                    onclick="openAddAppModal()">
+                <i class="fas fa-plus"></i>
+                <span>Nueva Aplicación</span>
             </button>
         </div>
     </div>
-</div>
 
-<!-- Applications Table -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-list me-2"></i>Aplicaciones
+    <!-- Applications Table -->
+    <div class="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
+        <div class="p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                <h5 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-list mr-3 text-blue-600"></i>Aplicaciones Desplegadas
                 </h5>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary btn-sm" onclick="refreshApps()">
-                        <i class="fas fa-sync-alt me-1"></i>Actualizar
+                <div class="flex flex-wrap gap-2">
+                    <button class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center space-x-2 border border-blue-200" 
+                            onclick="refreshApps()">
+                        <i class="fas fa-sync-alt" id="refreshAppsIcon"></i>
+                        <span>Actualizar</span>
                     </button>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
-                                data-bs-toggle="dropdown">
-                            <i class="fas fa-filter me-1"></i>Filtrar
+                    <div class="relative">
+                        <button class="bg-gray-50 hover:bg-gray-100 text-gray-600 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center space-x-2 border border-gray-200" 
+                                onclick="toggleFilterDropdown()">
+                            <i class="fas fa-filter"></i>
+                            <span>Filtrar</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
                         </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="filterApps('all')">Todas</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="filterApps('active')">Activas</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="filterApps('inactive')">Inactivas</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="filterApps('error')">Con Errores</a></li>
-                        </ul>
+                        <div id="filterDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onclick="filterApps('all')">
+                                <i class="fas fa-list mr-2"></i>Todas
+                            </a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onclick="filterApps('active')">
+                                <i class="fas fa-play-circle mr-2 text-green-600"></i>Activas
+                            </a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onclick="filterApps('inactive')">
+                                <i class="fas fa-pause-circle mr-2 text-gray-600"></i>Inactivas
+                            </a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onclick="filterApps('error')">
+                                <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>Con Errores
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Dominio</th>
-                                <th>Tipo</th>
-                                <th>Puerto</th>
-                                <th>Estado</th>
-                                <th>SSL</th>
-                                <th>Creado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="appsTableBody">
-                            <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando aplicaciones...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        </div>
+        
+        <div class="overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Aplicación</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Puerto</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SSL</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Creado</th>
+                            <th class="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="appsTableBody" class="bg-white divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                <div class="flex flex-col items-center space-y-3">
+                                    <i class="fas fa-spinner fa-spin text-3xl text-blue-500"></i>
+                                    <span class="text-sm">Cargando aplicaciones...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Add Application Modal -->
-<div class="modal fade" id="addAppModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-plus me-2"></i>Nueva Aplicación
+<div id="addAppModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-screen overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+            <div class="flex justify-between items-center">
+                <h5 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-plus mr-3 text-blue-600"></i>Nueva Aplicación
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addAppForm">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="appName" class="form-label">Nombre de la Aplicación</label>
-                                <input type="text" class="form-control" id="appName" name="name" 
-                                       placeholder="mi-app" required>
-                                <div class="form-text">Solo letras, números y guiones</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="appDomain" class="form-label">Dominio</label>
-                                <input type="text" class="form-control" id="appDomain" name="domain" 
-                                       placeholder="miapp.ejemplo.com" required>
-                                <div class="form-text">Dominio completo (FQDN)</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="appType" class="form-label">Tipo de Aplicación</label>
-                                <select class="form-control" id="appType" name="app_type" required>
-                                    <option value="">Seleccionar tipo...</option>
-                                    <option value="nextjs">Next.js</option>
-                                    <option value="fastapi">FastAPI</option>
-                                    <option value="nodejs">Node.js</option>
-                                    <option value="static">Sitio Estático</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="appPort" class="form-label">Puerto</label>
-                                <input type="number" class="form-control" id="appPort" name="port" 
-                                       placeholder="3000" min="1000" max="65535" required>
-                                <div class="form-text">Puerto para la aplicación (1000-65535)</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="appDirectory" class="form-label">Directorio de la Aplicación</label>
-                        <input type="text" class="form-control" id="appDirectory" name="directory_path" 
-                               placeholder="/var/www/mi-app" required>
-                        <div class="form-text">Ruta completa donde se instalará la aplicación</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="appGitUrl" class="form-label">URL del Repositorio Git (Opcional)</label>
-                        <input type="url" class="form-control" id="appGitUrl" name="git_url" 
-                               placeholder="https://github.com/usuario/mi-app.git">
-                        <div class="form-text">URL del repositorio para clonar el código</div>
-                    </div>
-
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Nota:</strong> La aplicación se configurará automáticamente con nginx como proxy reverso 
-                        y systemd para la gestión del servicio.
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="createApp()">
-                    <i class="fas fa-plus me-2"></i>Crear Aplicación
+                <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors" onclick="closeAddAppModal()">
+                    <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
+        </div>
+        
+        <div class="p-6">
+            <form id="addAppForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="appName" class="block text-sm font-medium text-gray-700 mb-2">Nombre de la Aplicación</label>
+                        <input type="text" 
+                               id="appName" 
+                               name="name" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                               placeholder="mi-app" 
+                               required>
+                        <p class="text-sm text-gray-500 mt-1">Solo letras, números y guiones</p>
+                    </div>
+                    <div>
+                        <label for="appDomain" class="block text-sm font-medium text-gray-700 mb-2">Dominio</label>
+                        <input type="text" 
+                               id="appDomain" 
+                               name="domain" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                               placeholder="miapp.ejemplo.com" 
+                               required>
+                        <p class="text-sm text-gray-500 mt-1">Dominio completo (FQDN)</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="appType" class="block text-sm font-medium text-gray-700 mb-2">Tipo de Aplicación</label>
+                        <select id="appType" 
+                                name="app_type" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                required>
+                            <option value="">Seleccionar tipo...</option>
+                            <option value="nextjs">Next.js</option>
+                            <option value="fastapi">FastAPI</option>
+                            <option value="nodejs">Node.js</option>
+                            <option value="static">Sitio Estático</option>
+                            <option value="react">React</option>
+                            <option value="vue">Vue.js</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="appPort" class="block text-sm font-medium text-gray-700 mb-2">Puerto</label>
+                        <input type="number" 
+                               id="appPort" 
+                               name="port" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                               placeholder="3000" 
+                               min="1000" 
+                               max="65535" 
+                               required>
+                        <p class="text-sm text-gray-500 mt-1">Puerto para la aplicación (1000-65535)</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="appDirectory" class="block text-sm font-medium text-gray-700 mb-2">Directorio de la Aplicación</label>
+                    <input type="text" 
+                           id="appDirectory" 
+                           name="directory_path" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                           placeholder="/var/www/mi-app" 
+                           required>
+                    <p class="text-sm text-gray-500 mt-1">Ruta completa donde se instalará la aplicación</p>
+                </div>
+
+                <div>
+                    <label for="appGitUrl" class="block text-sm font-medium text-gray-700 mb-2">URL del Repositorio Git (Opcional)</label>
+                    <input type="url" 
+                           id="appGitUrl" 
+                           name="git_url" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                           placeholder="https://github.com/usuario/mi-app.git">
+                    <p class="text-sm text-gray-500 mt-1">URL del repositorio para clonar el código</p>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-start space-x-3">
+                        <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div>
+                            <p class="text-sm text-blue-800 font-medium">Información importante</p>
+                            <p class="text-sm text-blue-700 mt-1">
+                                La aplicación se configurará automáticamente con nginx como proxy reverso 
+                                y systemd para la gestión del servicio.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+            <button type="button" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200" 
+                    onclick="closeAddAppModal()">
+                Cancelar
+            </button>
+            <button type="button" 
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center space-x-2" 
+                    onclick="createApp()">
+                <i class="fas fa-plus"></i>
+                <span>Crear Aplicación</span>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Edit Application Modal -->
-<div class="modal fade" id="editAppModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>Editar Aplicación
+<div id="editAppModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+            <div class="flex justify-between items-center">
+                <h5 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-edit mr-3 text-blue-600"></i>Editar Aplicación
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editAppForm">
-                    <input type="hidden" id="editAppId" name="id">
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editAppName" class="form-label">Nombre</label>
-                                <input type="text" class="form-control" id="editAppName" readonly>
-                                <div class="form-text">El nombre no se puede modificar</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editAppDomain" class="form-label">Dominio</label>
-                                <input type="text" class="form-control" id="editAppDomain" name="domain">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editAppType" class="form-label">Tipo</label>
-                                <input type="text" class="form-control" id="editAppType" readonly>
-                                <div class="form-text">El tipo no se puede modificar</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editAppPort" class="form-label">Puerto</label>
-                                <input type="number" class="form-control" id="editAppPort" name="port" 
-                                       min="1000" max="65535">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="editAppStatus" class="form-label">Estado</label>
-                        <select class="form-control" id="editAppStatus" name="status">
-                            <option value="active">Activa</option>
-                            <option value="inactive">Inactiva</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="updateApp()">
-                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors" onclick="closeEditAppModal()">
+                    <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
+        </div>
+        
+        <div class="p-6">
+            <form id="editAppForm" class="space-y-6">
+                <input type="hidden" id="editAppId" name="id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="editAppName" class="block text-sm font-medium text-gray-700 mb-2">Nombre</label>
+                        <input type="text" 
+                               id="editAppName" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                               readonly>
+                        <p class="text-sm text-gray-500 mt-1">El nombre no se puede modificar</p>
+                    </div>
+                    <div>
+                        <label for="editAppDomain" class="block text-sm font-medium text-gray-700 mb-2">Dominio</label>
+                        <input type="text" 
+                               id="editAppDomain" 
+                               name="domain"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="editAppType" class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+                        <input type="text" 
+                               id="editAppType" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                               readonly>
+                        <p class="text-sm text-gray-500 mt-1">El tipo no se puede modificar</p>
+                    </div>
+                    <div>
+                        <label for="editAppPort" class="block text-sm font-medium text-gray-700 mb-2">Puerto</label>
+                        <input type="number" 
+                               id="editAppPort" 
+                               name="port" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                               min="1000" 
+                               max="65535">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="editAppStatus" class="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+                    <select id="editAppStatus" 
+                            name="status"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        <option value="active">Activa</option>
+                        <option value="inactive">Inactiva</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+            <button type="button" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200" 
+                    onclick="closeEditAppModal()">
+                Cancelar
+            </button>
+            <button type="button" 
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center space-x-2" 
+                    onclick="updateApp()">
+                <i class="fas fa-save"></i>
+                <span>Guardar Cambios</span>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Application Details Modal -->
-<div class="modal fade" id="appDetailsModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-info-circle me-2"></i>Detalles de la Aplicación
+<div id="appDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-screen overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+            <div class="flex justify-between items-center">
+                <h5 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-info-circle mr-3 text-blue-600"></i>Detalles de la Aplicación
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="text-gray-400 hover:text-gray-600 transition-colors" onclick="closeAppDetailsModal()">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
             </div>
-            <div class="modal-body">
-                <div id="appDetailsContent">
-                    <div class="text-center py-4">
-                        <i class="fas fa-spinner fa-spin me-2"></i>Cargando detalles...
+        </div>
+        
+        <div class="p-6">
+            <div id="appDetailsContent">
+                <div class="text-center py-12">
+                    <div class="flex flex-col items-center space-y-3">
+                        <i class="fas fa-spinner fa-spin text-3xl text-blue-500"></i>
+                        <span class="text-sm text-gray-500">Cargando detalles...</span>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            </div>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end">
+            <button type="button" 
+                    class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200" 
+                    onclick="closeAppDetailsModal()">
+                Cerrar
+            </button>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -256,12 +337,21 @@ let applications = [];
 // Load applications
 async function loadApplications() {
     try {
+        const refreshIcon = document.getElementById('refreshAppsIcon');
+        if (refreshIcon) refreshIcon.classList.add('fa-spin');
+        
         const response = await axios.get('/api/v1/applications');
         applications = response.data;
         displayApplications();
+        
+        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+        
     } catch (error) {
         console.error('Error loading applications:', error);
         showAlert('Error al cargar las aplicaciones', 'danger');
+        
+        const refreshIcon = document.getElementById('refreshAppsIcon');
+        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
     }
 }
 
@@ -275,91 +365,101 @@ function displayApplications() {
     }
     
     if (filteredApps.length === 0) {
+        const emptyMessage = currentFilter === 'all' ? 'No hay aplicaciones registradas' : `No hay aplicaciones ${getFilterText(currentFilter)}`;
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center text-muted py-4">
-                    <i class="fas fa-inbox me-2"></i>No hay aplicaciones que mostrar
+                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                    <div class="flex flex-col items-center space-y-3">
+                        <i class="fas fa-inbox text-4xl text-gray-400"></i>
+                        <span class="text-sm">${emptyMessage}</span>
+                        ${currentFilter !== 'all' ? '<button class="text-blue-600 hover:text-blue-700 text-sm font-medium" onclick="filterApps(\'all\')">Ver todas las aplicaciones</button>' : ''}
+                    </div>
                 </td>
             </tr>`;
         return;
     }
     
     tbody.innerHTML = filteredApps.map(app => `
-        <tr>
-            <td>
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-cube me-2 text-muted"></i>
-                    <strong>${app.name}</strong>
+        <tr class="hover:bg-gray-50 transition-colors duration-200">
+            <td class="px-6 py-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-${getAppIcon(app.app_type)} text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-semibold text-gray-900">${app.name}</div>
+                        <div class="text-xs text-gray-500 flex items-center mt-1">
+                            <i class="fas fa-globe mr-1"></i>
+                            <a href="https://${app.domain}" target="_blank" class="hover:text-blue-600 transition-colors">
+                                ${app.domain}
+                                <i class="fas fa-external-link-alt ml-1 text-xs"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </td>
-            <td>
-                <a href="https://${app.domain}" target="_blank" class="text-decoration-none">
-                    ${app.domain} <i class="fas fa-external-link-alt ms-1 text-muted small"></i>
-                </a>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getAppTypeBadgeClass(app.app_type)}">
+                    <i class="fas fa-${getAppIcon(app.app_type)} mr-1"></i>
+                    ${getAppTypeText(app.app_type)}
+                </span>
             </td>
-            <td>
-                <span class="badge bg-info">${app.app_type}</span>
+            <td class="px-6 py-4">
+                <code class="px-2 py-1 bg-gray-100 rounded text-sm font-mono">${app.port}</code>
             </td>
-            <td>
-                <code>${app.port}</code>
-            </td>
-            <td>
-                <span class="badge ${getStatusBadgeClass(app.status)}">
-                    <i class="fas ${getStatusIcon(app.status)} me-1"></i>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(app.status)}">
+                    <span class="w-2 h-2 ${getStatusDotClass(app.status)} rounded-full mr-2"></span>
                     ${getStatusText(app.status)}
                 </span>
             </td>
-            <td>
-                ${app.ssl_enabled 
-                    ? '<i class="fas fa-shield-alt text-success" title="SSL Habilitado"></i>'
-                    : '<i class="fas fa-shield-alt text-muted" title="SSL Deshabilitado"></i>'
-                }
+            <td class="px-6 py-4">
+                <div class="flex items-center">
+                    ${app.ssl_enabled 
+                        ? '<i class="fas fa-shield-alt text-green-500 text-lg" title="SSL Habilitado"></i>'
+                        : '<i class="fas fa-shield-alt text-gray-400 text-lg" title="SSL Deshabilitado"></i>'
+                    }
+                </div>
             </td>
-            <td>
-                <small class="text-muted">${formatDate(app.created_at)}</small>
+            <td class="px-6 py-4">
+                <div class="text-sm text-gray-500">
+                    <div>${formatDate(app.created_at)}</div>
+                    <div class="text-xs text-gray-400">${formatTime(app.created_at)}</div>
+                </div>
             </td>
-            <td>
-                <div class="dropdown">
-                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
-                            data-bs-toggle="dropdown">
-                        <i class="fas fa-cog"></i>
+            <td class="px-6 py-4">
+                <div class="flex items-center justify-end space-x-2">
+                    <button class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition-all duration-200" 
+                            onclick="showAppDetails(${app.id})" title="Ver detalles">
+                        <i class="fas fa-info-circle text-sm"></i>
                     </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="showAppDetails(${app.id})">
-                                <i class="fas fa-info-circle me-2"></i>Ver Detalles
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="editApp(${app.id})">
-                                <i class="fas fa-edit me-2"></i>Editar
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item ${app.status === 'active' ? 'disabled' : ''}" 
-                               href="#" onclick="startApp(${app.id})">
-                                <i class="fas fa-play me-2 text-success"></i>Iniciar
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item ${app.status === 'inactive' ? 'disabled' : ''}" 
-                               href="#" onclick="stopApp(${app.id})">
-                                <i class="fas fa-stop me-2 text-warning"></i>Detener
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="restartApp(${app.id})">
-                                <i class="fas fa-redo me-2 text-info"></i>Reiniciar
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item text-danger" href="#" onclick="deleteApp(${app.id}, '${app.name}')">
-                                <i class="fas fa-trash me-2"></i>Eliminar
-                            </a>
-                        </li>
-                    </ul>
+                    <button class="text-gray-600 hover:text-gray-700 hover:bg-gray-50 p-2 rounded-lg transition-all duration-200" 
+                            onclick="editApp(${app.id})" title="Editar">
+                        <i class="fas fa-edit text-sm"></i>
+                    </button>
+                    <div class="relative">
+                        <button class="text-gray-600 hover:text-gray-700 hover:bg-gray-50 p-2 rounded-lg transition-all duration-200" 
+                                onclick="toggleActionDropdown(${app.id})" title="Más acciones">
+                            <i class="fas fa-ellipsis-v text-sm"></i>
+                        </button>
+                        <div id="actionDropdown-${app.id}" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
+                            ${app.status === 'active' 
+                                ? `<button class="w-full text-left px-4 py-2 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors flex items-center" onclick="stopApp(${app.id})">
+                                       <i class="fas fa-stop mr-3"></i>Detener
+                                   </button>`
+                                : `<button class="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors flex items-center" onclick="startApp(${app.id})">
+                                       <i class="fas fa-play mr-3"></i>Iniciar
+                                   </button>`
+                            }
+                            <button class="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 transition-colors flex items-center" onclick="restartApp(${app.id})">
+                                <i class="fas fa-redo mr-3"></i>Reiniciar
+                            </button>
+                            <hr class="my-2 border-gray-200">
+                            <button class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors flex items-center" onclick="deleteApp(${app.id}, '${app.name}')">
+                                <i class="fas fa-trash mr-3"></i>Eliminar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </td>
         </tr>
@@ -384,7 +484,7 @@ async function createApp() {
         await axios.post('/api/v1/applications', appData);
         
         // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('addAppModal')).hide();
+        closeAddAppModal();
         showAlert('Aplicación creada correctamente', 'success');
         form.reset();
         loadApplications();
@@ -410,7 +510,7 @@ async function editApp(appId) {
         document.getElementById('editAppStatus').value = app.status;
         
         // Show modal
-        new bootstrap.Modal(document.getElementById('editAppModal')).show();
+        openEditAppModal();
         
     } catch (error) {
         console.error('Error editing application:', error);
@@ -433,7 +533,7 @@ async function updateApp() {
         await axios.put(`/api/v1/applications/${appId}`, updateData);
         
         // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('editAppModal')).hide();
+        closeEditAppModal();
         showAlert('Aplicación actualizada correctamente', 'success');
         loadApplications();
         
@@ -445,9 +545,15 @@ async function updateApp() {
 }
 
 async function deleteApp(appId, appName) {
-    if (!confirm(`¿Está seguro de que desea eliminar la aplicación "${appName}"?`)) {
-        return;
-    }
+    // Show custom confirmation modal instead of browser alert
+    const confirmed = await showConfirmModal(
+        'Eliminar Aplicación',
+        `¿Está seguro de que desea eliminar la aplicación "${appName}"? Esta acción no se puede deshacer.`,
+        'Eliminar',
+        'danger'
+    );
+    
+    if (!confirmed) return;
     
     try {
         await axios.delete(`/api/v1/applications/${appId}`);
@@ -467,7 +573,8 @@ async function startApp(appId) {
         showAlert('Aplicación iniciada correctamente', 'success');
         loadApplications();
     } catch (error) {
-        showAlert('Error al iniciar la aplicación', 'danger');
+        const message = error.response?.data?.detail || 'Error al iniciar la aplicación';
+        showAlert(message, 'danger');
     }
 }
 
@@ -477,86 +584,162 @@ async function stopApp(appId) {
         showAlert('Aplicación detenida correctamente', 'success');
         loadApplications();
     } catch (error) {
-        showAlert('Error al detener la aplicación', 'danger');
+        const message = error.response?.data?.detail || 'Error al detener la aplicación';
+        showAlert(message, 'danger');
     }
 }
 
 async function restartApp(appId) {
     try {
-        await stopApp(appId);
-        setTimeout(() => startApp(appId), 2000);
+        await axios.post(`/api/v1/applications/${appId}/restart`);
+        showAlert('Aplicación reiniciada correctamente', 'success');
+        loadApplications();
     } catch (error) {
-        showAlert('Error al reiniciar la aplicación', 'danger');
+        const message = error.response?.data?.detail || 'Error al reiniciar la aplicación';
+        showAlert(message, 'danger');
     }
 }
 
 async function showAppDetails(appId) {
     try {
-        const response = await axios.get(`/api/v1/applications/${appId}`);
-        const app = response.data;
+        openAppDetailsModal();
         
-        // Get usage data
-        const usageResponse = await axios.get(`/api/v1/system/usage/${appId}?hours=24`);
-        const usage = usageResponse.data.usage_history;
+        const [appResponse, usageResponse, logsResponse] = await Promise.allSettled([
+            axios.get(`/api/v1/applications/${appId}`),
+            axios.get(`/api/v1/system/usage/${appId}?hours=24`).catch(() => ({ data: { usage_history: [] } })),
+            axios.get(`/api/v1/system/logs?app_id=${appId}&limit=10`).catch(() => ({ data: { logs: [] } }))
+        ]);
         
-        // Get logs
-        const logsResponse = await axios.get(`/api/v1/system/logs?app_id=${appId}&limit=10`);
-        const logs = logsResponse.data.logs;
+        const app = appResponse.status === 'fulfilled' ? appResponse.value.data : null;
+        const usage = usageResponse.status === 'fulfilled' ? usageResponse.value.data.usage_history : [];
+        const logs = logsResponse.status === 'fulfilled' ? logsResponse.value.data.logs : [];
+        
+        if (!app) throw new Error('App not found');
         
         // Populate details modal
         document.getElementById('appDetailsContent').innerHTML = `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6>Información General</h6>
-                    <table class="table table-sm">
-                        <tr><td>Nombre:</td><td><strong>${app.name}</strong></td></tr>
-                        <tr><td>Dominio:</td><td>${app.domain}</td></tr>
-                        <tr><td>Tipo:</td><td>${app.app_type}</td></tr>
-                        <tr><td>Puerto:</td><td>${app.port}</td></tr>
-                        <tr><td>Estado:</td><td><span class="badge ${getStatusBadgeClass(app.status)}">${getStatusText(app.status)}</span></td></tr>
-                        <tr><td>SSL:</td><td>${app.ssl_enabled ? 'Habilitado' : 'Deshabilitado'}</td></tr>
-                        <tr><td>Directorio:</td><td><code>${app.directory_path}</code></td></tr>
-                        <tr><td>Git URL:</td><td>${app.git_url || 'N/A'}</td></tr>
-                        <tr><td>Creado:</td><td>${formatDate(app.created_at)}</td></tr>
-                    </table>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-info-circle mr-2 text-blue-600"></i>Información General
+                        </h3>
+                        <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Nombre:</span>
+                                <span class="text-sm font-semibold text-gray-900">${app.name}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Dominio:</span>
+                                <a href="https://${app.domain}" target="_blank" class="text-sm text-blue-600 hover:text-blue-700 flex items-center">
+                                    ${app.domain}
+                                    <i class="fas fa-external-link-alt ml-1 text-xs"></i>
+                                </a>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Tipo:</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getAppTypeBadgeClass(app.app_type)}">
+                                    <i class="fas fa-${getAppIcon(app.app_type)} mr-1"></i>
+                                    ${getAppTypeText(app.app_type)}
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Puerto:</span>
+                                <code class="px-2 py-0.5 bg-gray-200 rounded text-xs font-mono">${app.port}</code>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Estado:</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(app.status)}">
+                                    <span class="w-2 h-2 ${getStatusDotClass(app.status)} rounded-full mr-1"></span>
+                                    ${getStatusText(app.status)}
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">SSL:</span>
+                                <span class="flex items-center">
+                                    <i class="fas fa-shield-alt ${app.ssl_enabled ? 'text-green-500' : 'text-gray-400'} mr-1"></i>
+                                    <span class="text-sm ${app.ssl_enabled ? 'text-green-600' : 'text-gray-500'}">${app.ssl_enabled ? 'Habilitado' : 'Deshabilitado'}</span>
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Directorio:</span>
+                                <code class="px-2 py-0.5 bg-gray-200 rounded text-xs font-mono break-all">${app.directory_path}</code>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Git URL:</span>
+                                <span class="text-sm text-gray-500">${app.git_url || 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm font-medium text-gray-600">Creado:</span>
+                                <span class="text-sm text-gray-500">${formatDate(app.created_at)}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <h6>Uso de Recursos (Últimas 24h)</h6>
-                    ${usage.length > 0 ? `
-                        <div class="mb-3">
-                            <small class="text-muted">CPU Promedio:</small>
-                            <div class="progress">
-                                <div class="progress-bar bg-info" style="width: ${Math.round(usage.reduce((a, u) => a + u.cpu_usage, 0) / usage.length)}%"></div>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <small class="text-muted">Memoria Promedio:</small>
-                            <div class="progress">
-                                <div class="progress-bar bg-warning" style="width: ${Math.round(usage.reduce((a, u) => a + u.memory_usage, 0) / usage.length)}%"></div>
-                            </div>
-                        </div>
-                    ` : '<p class="text-muted">No hay datos de uso disponibles</p>'}
-                    
-                    <h6 class="mt-4">Logs Recientes</h6>
-                    <div style="max-height: 300px; overflow-y: auto;">
-                        ${logs.length > 0 ? logs.map(log => `
-                            <div class="d-flex mb-2">
-                                <span class="badge bg-${getLogColor(log.level)} me-2">${log.level}</span>
-                                <div>
-                                    <div class="small">${log.message}</div>
-                                    <div class="text-muted" style="font-size: 0.8em;">${formatDateTime(log.timestamp)}</div>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-chart-line mr-2 text-green-600"></i>Uso de Recursos (24h)
+                        </h3>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            ${usage.length > 0 ? `
+                                <div class="space-y-4">
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-2">
+                                            <span class="font-medium text-gray-600">CPU Promedio:</span>
+                                            <span class="font-semibold text-blue-600">${Math.round(usage.reduce((a, u) => a + u.cpu_usage, 0) / usage.length)}%</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-3">
+                                            <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" style="width: ${Math.round(usage.reduce((a, u) => a + u.cpu_usage, 0) / usage.length)}%"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-2">
+                                            <span class="font-medium text-gray-600">Memoria Promedio:</span>
+                                            <span class="font-semibold text-yellow-600">${Math.round(usage.reduce((a, u) => a + u.memory_usage, 0) / usage.length)}%</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-3">
+                                            <div class="bg-yellow-500 h-3 rounded-full transition-all duration-500" style="width: ${Math.round(usage.reduce((a, u) => a + u.memory_usage, 0) / usage.length)}%"></div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        `).join('') : '<p class="text-muted">No hay logs disponibles</p>'}
+                            ` : '<p class="text-sm text-gray-500 text-center py-4">No hay datos de uso disponibles</p>'}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-file-alt mr-2 text-purple-600"></i>Logs Recientes
+                        </h3>
+                        <div class="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto custom-scrollbar">
+                            ${logs.length > 0 ? logs.map(log => `
+                                <div class="flex items-start space-x-3 mb-3 last:mb-0 p-3 bg-white rounded-lg border border-gray-200">
+                                    <div class="flex-shrink-0 w-6 h-6 rounded-full ${getLogBgClass(log.level)} flex items-center justify-center">
+                                        <i class="fas ${getLogIcon(log.level)} text-xs text-white"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium text-gray-900 mb-1">${log.message}</div>
+                                        <div class="text-xs text-gray-500">${formatDateTime(log.timestamp)}</div>
+                                    </div>
+                                </div>
+                            `).join('') : '<p class="text-sm text-gray-500 text-center py-4">No hay logs disponibles</p>'}
+                        </div>
                     </div>
                 </div>
             </div>
         `;
         
-        new bootstrap.Modal(document.getElementById('appDetailsModal')).show();
-        
     } catch (error) {
         console.error('Error loading application details:', error);
+        document.getElementById('appDetailsContent').innerHTML = `
+            <div class="text-center py-12">
+                <div class="flex flex-col items-center space-y-3">
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-500"></i>
+                    <span class="text-sm text-gray-500">Error al cargar los detalles de la aplicación</span>
+                </div>
+            </div>
+        `;
         showAlert('Error al cargar los detalles de la aplicación', 'danger');
     }
 }
@@ -565,27 +748,84 @@ async function showAppDetails(appId) {
 function filterApps(filter) {
     currentFilter = filter;
     displayApplications();
+    closeFilterDropdown();
+    
+    // Update filter button text
+    const filterText = getFilterText(filter);
+    // You can update button text here if needed
 }
 
 function refreshApps() {
     loadApplications();
 }
 
-function getStatusBadgeClass(status) {
-    switch (status) {
-        case 'active': return 'bg-success';
-        case 'inactive': return 'bg-secondary';
-        case 'error': return 'bg-danger';
-        default: return 'bg-warning';
+function getFilterText(filter) {
+    switch (filter) {
+        case 'active': return 'activas';
+        case 'inactive': return 'inactivas';
+        case 'error': return 'con errores';
+        default: return 'todas';
     }
 }
 
-function getStatusIcon(status) {
+function getAppIcon(appType) {
+    const icons = {
+        'fastapi': 'rocket',
+        'nextjs': 'react',
+        'nodejs': 'node-js',
+        'static': 'file-alt',
+        'react': 'react',
+        'vue': 'vuejs',
+        'angular': 'angular',
+        'django': 'python',
+        'flask': 'flask'
+    };
+    return icons[appType] || 'cube';
+}
+
+function getAppTypeBadgeClass(appType) {
+    const classes = {
+        'fastapi': 'bg-green-100 text-green-800 border border-green-200',
+        'nextjs': 'bg-blue-100 text-blue-800 border border-blue-200',
+        'nodejs': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+        'static': 'bg-gray-100 text-gray-800 border border-gray-200',
+        'react': 'bg-cyan-100 text-cyan-800 border border-cyan-200',
+        'vue': 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+    };
+    return classes[appType] || 'bg-gray-100 text-gray-800 border border-gray-200';
+}
+
+function getAppTypeText(appType) {
+    const texts = {
+        'fastapi': 'FastAPI',
+        'nextjs': 'Next.js',
+        'nodejs': 'Node.js',
+        'static': 'Estático',
+        'react': 'React',
+        'vue': 'Vue.js'
+    };
+    return texts[appType] || appType;
+}
+
+function getStatusBadgeClass(status) {
     switch (status) {
-        case 'active': return 'fa-play-circle';
-        case 'inactive': return 'fa-pause-circle';
-        case 'error': return 'fa-exclamation-triangle';
-        default: return 'fa-question-circle';
+        case 'active': return 'bg-green-100 text-green-800 border border-green-200';
+        case 'inactive': return 'bg-gray-100 text-gray-800 border border-gray-200';
+        case 'error': return 'bg-red-100 text-red-800 border border-red-200';
+        case 'starting': return 'bg-blue-100 text-blue-800 border border-blue-200';
+        case 'stopping': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+        default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+    }
+}
+
+function getStatusDotClass(status) {
+    switch (status) {
+        case 'active': return 'bg-green-500';
+        case 'inactive': return 'bg-gray-400';
+        case 'error': return 'bg-red-500';
+        case 'starting': return 'bg-blue-500 animate-pulse';
+        case 'stopping': return 'bg-yellow-500 animate-pulse';
+        default: return 'bg-gray-400';
     }
 }
 
@@ -594,34 +834,205 @@ function getStatusText(status) {
         case 'active': return 'Activa';
         case 'inactive': return 'Inactiva';
         case 'error': return 'Error';
+        case 'starting': return 'Iniciando';
+        case 'stopping': return 'Deteniendo';
         default: return 'Desconocido';
     }
 }
 
-function getLogColor(level) {
-    switch (level) {
-        case 'ERROR': return 'danger';
-        case 'WARNING': return 'warning';
-        case 'INFO': return 'info';
-        default: return 'secondary';
+function getLogIcon(level) {
+    switch (level?.toUpperCase()) {
+        case 'ERROR': return 'fa-exclamation-triangle';
+        case 'WARNING': return 'fa-exclamation-circle';
+        case 'INFO': return 'fa-info-circle';
+        case 'SUCCESS': return 'fa-check-circle';
+        case 'DEBUG': return 'fa-bug';
+        default: return 'fa-circle';
+    }
+}
+
+function getLogBgClass(level) {
+    switch (level?.toUpperCase()) {
+        case 'ERROR': return 'bg-red-500';
+        case 'WARNING': return 'bg-yellow-500';
+        case 'INFO': return 'bg-blue-500';
+        case 'SUCCESS': return 'bg-green-500';
+        case 'DEBUG': return 'bg-purple-500';
+        default: return 'bg-gray-500';
     }
 }
 
 function formatDate(dateString) {
-    return new Date(dateString).toLocaleString();
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch (error) {
+        return dateString;
+    }
+}
+
+function formatTime(dateString) {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (error) {
+        return '';
+    }
 }
 
 function formatDateTime(timestamp) {
-    return new Date(timestamp).toLocaleString();
+    try {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        
+        if (diff < 60) {
+            return 'Hace unos segundos';
+        } else if (diff < 3600) {
+            const minutes = Math.floor(diff / 60);
+            return `Hace ${minutes} minuto${minutes !== 1 ? 's' : ''}`;
+        } else if (diff < 86400) {
+            const hours = Math.floor(diff / 3600);
+            return `Hace ${hours} hora${hours !== 1 ? 's' : ''}`;
+        } else {
+            return date.toLocaleDateString('es-ES') + ' ' + date.toLocaleTimeString('es-ES');
+        }
+    } catch (error) {
+        return timestamp;
+    }
 }
 
-function showAlert(message, type) {
+// Modal functions
+function openAddAppModal() {
+    document.getElementById('addAppModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddAppModal() {
+    document.getElementById('addAppModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+function openEditAppModal() {
+    document.getElementById('editAppModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeEditAppModal() {
+    document.getElementById('editAppModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+function openAppDetailsModal() {
+    document.getElementById('appDetailsModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAppDetailsModal() {
+    document.getElementById('appDetailsModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Dropdown functions
+function toggleFilterDropdown() {
+    const dropdown = document.getElementById('filterDropdown');
+    dropdown.classList.toggle('hidden');
+}
+
+function closeFilterDropdown() {
+    document.getElementById('filterDropdown').classList.add('hidden');
+}
+
+function toggleActionDropdown(appId) {
+    // Close all other dropdowns first
+    document.querySelectorAll('[id^="actionDropdown-"]').forEach(dropdown => {
+        if (dropdown.id !== `actionDropdown-${appId}`) {
+            dropdown.classList.add('hidden');
+        }
+    });
+    
+    // Toggle current dropdown
+    const dropdown = document.getElementById(`actionDropdown-${appId}`);
+    dropdown.classList.toggle('hidden');
+}
+
+// Custom confirmation modal
+function showConfirmModal(title, message, confirmText = 'Confirmar', type = 'warning') {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                <div class="p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="flex-shrink-0 w-12 h-12 rounded-full ${type === 'danger' ? 'bg-red-100' : 'bg-yellow-100'} flex items-center justify-center">
+                            <i class="fas ${type === 'danger' ? 'fa-exclamation-triangle text-red-600' : 'fa-question-circle text-yellow-600'} text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-6">${message}</p>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" onclick="resolveConfirm(false)">
+                            Cancelar
+                        </button>
+                        <button type="button" class="px-4 py-2 ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white rounded-lg transition-colors" onclick="resolveConfirm(true)">
+                            ${confirmText}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+        
+        window.resolveConfirm = (result) => {
+            document.body.removeChild(modal);
+            document.body.style.overflow = 'auto';
+            delete window.resolveConfirm;
+            resolve(result);
+        };
+    });
+}
+
+function showAlert(message, type = 'info') {
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.alert-notification');
+    existingAlerts.forEach(alert => alert.remove());
+    
     const alert = document.createElement('div');
-    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    const bgColor = {
+        'success': 'bg-green-50 border-green-200 text-green-800',
+        'danger': 'bg-red-50 border-red-200 text-red-800',
+        'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+        'info': 'bg-blue-50 border-blue-200 text-blue-800'
+    }[type] || 'bg-blue-50 border-blue-200 text-blue-800';
+    
+    const icon = {
+        'success': 'fa-check-circle',
+        'danger': 'fa-exclamation-triangle',
+        'warning': 'fa-exclamation-circle',
+        'info': 'fa-info-circle'
+    }[type] || 'fa-info-circle';
+    
+    alert.className = `alert-notification ${bgColor} border px-4 py-3 rounded-lg mb-4 relative shadow-sm`;
     alert.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-2"></i>
+            <span class="font-medium">${message}</span>
+            <button type="button" class="absolute top-3 right-3 text-current opacity-50 hover:opacity-75 transition-opacity" onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     `;
     
     const main = document.querySelector('main');
@@ -629,10 +1040,25 @@ function showAlert(message, type) {
     
     setTimeout(() => {
         if (alert.parentNode) {
-            alert.remove();
+            alert.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 500);
         }
     }, 5000);
 }
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.relative')) {
+        closeFilterDropdown();
+        document.querySelectorAll('[id^="actionDropdown-"]').forEach(dropdown => {
+            dropdown.classList.add('hidden');
+        });
+    }
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {

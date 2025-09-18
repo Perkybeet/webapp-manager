@@ -3,165 +3,201 @@
 {% block title %}Dashboard - WebApp Manager SAAS{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <h1 class="text-3xl font-bold text-gray-900 flex items-center">
-            <i class="fas fa-tachometer-alt mr-3 text-blue-600"></i>
-            Dashboard
-        </h1>
-        <div class="flex items-center space-x-3">
-            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2" onclick="refreshStats()">
-                <i class="fas fa-sync-alt"></i>
-                <span>Actualizar</span>
-            </button>
-            <span class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm" id="lastUpdate">Cargando...</span>
+<div class="bg-white min-h-screen">
+    <div class="mb-8">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-tachometer-alt mr-3 text-blue-600"></i>
+                Dashboard
+            </h1>
+            <div class="flex items-center space-x-3">
+                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center space-x-2 shadow-sm" onclick="refreshStats()">
+                    <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                    <span>Actualizar</span>
+                </button>
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse" id="statusIndicator"></div>
+                    <span class="bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-sm border border-gray-200" id="lastUpdate">Conectando...</span>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
+    </div></div>
 
-<!-- Statistics Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <div class="text-blue-100 text-sm font-medium">Aplicaciones Totales</div>
-                <div class="text-3xl font-bold" id="totalApps">--</div>
-            </div>
-            <div class="text-blue-200">
-                <i class="fas fa-cubes text-3xl opacity-75"></i>
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-blue-100 text-sm font-medium mb-1">Aplicaciones Totales</div>
+                    <div class="text-3xl font-bold" id="totalApps">--</div>
+                    <div class="text-blue-200 text-xs mt-1" id="totalAppsChange">+0 desde ayer</div>
+                </div>
+                <div class="text-blue-200">
+                    <i class="fas fa-cubes text-3xl opacity-75"></i>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <div class="text-green-100 text-sm font-medium">Apps Activas</div>
-                <div class="text-3xl font-bold" id="activeApps">--</div>
-            </div>
-            <div class="text-green-200">
-                <i class="fas fa-play-circle text-3xl opacity-75"></i>
+        <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-green-100 text-sm font-medium mb-1">Apps Activas</div>
+                    <div class="text-3xl font-bold" id="activeApps">--</div>
+                    <div class="text-green-200 text-xs mt-1" id="activeAppsChange">--% uptime</div>
+                </div>
+                <div class="text-green-200">
+                    <i class="fas fa-play-circle text-3xl opacity-75"></i>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <div class="text-yellow-100 text-sm font-medium">Apps Inactivas</div>
-                <div class="text-3xl font-bold" id="inactiveApps">--</div>
-            </div>
-            <div class="text-yellow-200">
-                <i class="fas fa-pause-circle text-3xl opacity-75"></i>
+        <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-orange-100 text-sm font-medium mb-1">Apps Inactivas</div>
+                    <div class="text-3xl font-bold" id="inactiveApps">--</div>
+                    <div class="text-orange-200 text-xs mt-1" id="inactiveAppsChange">Necesitan atención</div>
+                </div>
+                <div class="text-orange-200">
+                    <i class="fas fa-pause-circle text-3xl opacity-75"></i>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <div class="text-purple-100 text-sm font-medium">Uso de CPU</div>
-                <div class="text-3xl font-bold" id="cpuUsage">--%</div>
+        <div class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-purple-100 text-sm font-medium mb-1">Uso de CPU</div>
+                    <div class="text-3xl font-bold" id="cpuUsage">--%</div>
+                    <div class="text-purple-200 text-xs mt-1" id="cpuTrend">Estable</div>
+                </div>
+                <div class="text-purple-200">
+                    <i class="fas fa-microchip text-3xl opacity-75"></i>
+                </div>
             </div>
-            <div class="text-purple-200">
-                <i class="fas fa-microchip text-3xl opacity-75"></i>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- System Usage -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
-                <i class="fas fa-microchip mr-2 text-blue-600"></i>Uso de CPU
-            </h5>
-        </div>
-        <div class="relative">
-            <div class="bg-gray-200 rounded-full h-6 mb-2">
-                <div class="bg-blue-600 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-sm font-medium" 
-                     style="width: 0%" id="cpuBar">0%</div>
-            </div>
-            <small class="text-gray-500">Promedio del sistema</small>
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
-                <i class="fas fa-memory mr-2 text-yellow-600"></i>Uso de Memoria
-            </h5>
-        </div>
-        <div class="relative">
-            <div class="bg-gray-200 rounded-full h-6 mb-2">
-                <div class="bg-yellow-500 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-sm font-medium" 
-                     style="width: 0%" id="memoryBar">0%</div>
-            </div>
-            <small class="text-gray-500">RAM utilizada</small>
-        </div>
-    </div>
-
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
-                <i class="fas fa-hdd mr-2 text-red-600"></i>Uso de Disco
-            </h5>
-        </div>
-        <div class="relative">
-            <div class="bg-gray-200 rounded-full h-6 mb-2">
-                <div class="bg-red-500 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-sm font-medium" 
-                     style="width: 0%" id="diskBar">0%</div>
-            </div>
-            <small class="text-gray-500">Almacenamiento usado</small>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Applications and Activity -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-lg shadow-lg">
-        <div class="p-6 border-b border-gray-200">
-            <div class="flex justify-between items-center">
+    <!-- System Usage -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between mb-6">
                 <h5 class="text-lg font-semibold text-gray-900 flex items-center">
-                    <i class="fas fa-list mr-2 text-blue-600"></i>Aplicaciones Recientes
+                    <i class="fas fa-microchip mr-2 text-blue-600"></i>Uso de CPU
                 </h5>
-                <a href="/domains" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Ver todas</a>
+                <span class="text-2xl font-bold text-blue-600" id="cpuPercentage">0%</span>
+            </div>
+            <div class="relative mb-3">
+                <div class="bg-gray-200 rounded-full h-8 shadow-inner">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-8 rounded-full transition-all duration-1000 flex items-center justify-center text-white text-sm font-medium shadow-sm" 
+                         style="width: 0%" id="cpuBar">
+                        <span class="text-xs font-semibold" id="cpuText">0%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500">
+                <span>Promedio del sistema</span>
+                <span id="cpuCores">-- núcleos</span>
             </div>
         </div>
-        <div class="p-0">
-            <div class="overflow-x-auto">
-                <table class="min-w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="recentApps" class="bg-white divide-y divide-gray-200">
-                        <!-- Apps will be loaded here -->
-                        <tr>
-                            <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>Cargando aplicaciones...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-memory mr-2 text-yellow-600"></i>Uso de Memoria
+                </h5>
+                <span class="text-2xl font-bold text-yellow-600" id="memoryPercentage">0%</span>
+            </div>
+            <div class="relative mb-3">
+                <div class="bg-gray-200 rounded-full h-8 shadow-inner">
+                    <div class="bg-gradient-to-r from-yellow-400 to-yellow-500 h-8 rounded-full transition-all duration-1000 flex items-center justify-center text-white text-sm font-medium shadow-sm" 
+                         style="width: 0%" id="memoryBar">
+                        <span class="text-xs font-semibold" id="memoryText">0%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500">
+                <span id="memoryUsed">-- GB usado</span>
+                <span id="memoryTotal">de -- GB</span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-hdd mr-2 text-red-600"></i>Uso de Disco
+                </h5>
+                <span class="text-2xl font-bold text-red-600" id="diskPercentage">0%</span>
+            </div>
+            <div class="relative mb-3">
+                <div class="bg-gray-200 rounded-full h-8 shadow-inner">
+                    <div class="bg-gradient-to-r from-red-400 to-red-500 h-8 rounded-full transition-all duration-1000 flex items-center justify-center text-white text-sm font-medium shadow-sm" 
+                         style="width: 0%" id="diskBar">
+                        <span class="text-xs font-semibold" id="diskText">0%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500">
+                <span id="diskUsed">-- GB usado</span>
+                <span id="diskTotal">de -- GB</span>
             </div>
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-lg">
-        <div class="p-6 border-b border-gray-200">
-            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
-                <i class="fas fa-history mr-2 text-green-600"></i>Actividad Reciente
-            </h5>
+    <!-- Recent Applications and Activity -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <div class="flex justify-between items-center">
+                    <h5 class="text-xl font-semibold text-gray-900 flex items-center">
+                        <i class="fas fa-list mr-3 text-blue-600"></i>Aplicaciones Recientes
+                    </h5>
+                    <a href="/domains" class="bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-1">
+                        <span>Ver todas</span>
+                        <i class="fas fa-arrow-right text-xs"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Aplicación</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Estado</th>
+                                <th class="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentApps" class="bg-white divide-y divide-gray-100">
+                            <!-- Apps will be loaded here -->
+                            <tr>
+                                <td colspan="3" class="px-6 py-12 text-center text-gray-500">
+                                    <div class="flex flex-col items-center space-y-2">
+                                        <i class="fas fa-spinner fa-spin text-2xl text-blue-500"></i>
+                                        <span class="text-sm">Cargando aplicaciones...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        <div class="p-6 max-h-96 overflow-y-auto" id="activityLog">
-            <!-- Activity will be loaded here -->
-            <div class="text-center text-gray-500 py-8">
-                <i class="fas fa-spinner fa-spin mr-2"></i>Cargando actividad...
+
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <h5 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-history mr-3 text-green-600"></i>Actividad Reciente
+                </h5>
+            </div>
+            <div class="p-6 max-h-96 overflow-y-auto custom-scrollbar" id="activityLog">
+                <!-- Activity will be loaded here -->
+                <div class="text-center text-gray-500 py-12">
+                    <div class="flex flex-col items-center space-y-2">
+                        <i class="fas fa-spinner fa-spin text-2xl text-green-500"></i>
+                        <span class="text-sm">Cargando actividad...</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -170,105 +206,271 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    /* Custom scrollbar for activity log */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+</style>
+
 <script>
 let refreshInterval;
+let websocket = null;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+
+// WebSocket connection for real-time updates
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
+    
+    try {
+        websocket = new WebSocket(wsUrl);
+        
+        websocket.onopen = function(event) {
+            console.log('Dashboard WebSocket connected');
+            reconnectAttempts = 0;
+            updateConnectionStatus('connected');
+        };
+        
+        websocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleRealtimeUpdate(data);
+        };
+        
+        websocket.onclose = function(event) {
+            console.log('Dashboard WebSocket disconnected');
+            updateConnectionStatus('disconnected');
+            
+            // Attempt to reconnect
+            if (reconnectAttempts < maxReconnectAttempts) {
+                setTimeout(() => {
+                    reconnectAttempts++;
+                    console.log(`Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                    connectWebSocket();
+                }, 5000 * reconnectAttempts);
+            }
+        };
+        
+        websocket.onerror = function(error) {
+            console.error('Dashboard WebSocket error:', error);
+            updateConnectionStatus('error');
+        };
+    } catch (error) {
+        console.error('Failed to connect WebSocket:', error);
+        updateConnectionStatus('error');
+        // Fall back to periodic updates
+        startPeriodicUpdates();
+    }
+}
+
+function updateConnectionStatus(status) {
+    const indicator = document.getElementById('statusIndicator');
+    const lastUpdate = document.getElementById('lastUpdate');
+    
+    switch (status) {
+        case 'connected':
+            indicator.className = 'w-3 h-3 bg-green-400 rounded-full animate-pulse';
+            lastUpdate.textContent = 'En tiempo real';
+            break;
+        case 'disconnected':
+            indicator.className = 'w-3 h-3 bg-yellow-400 rounded-full';
+            lastUpdate.textContent = 'Reconectando...';
+            break;
+        case 'error':
+            indicator.className = 'w-3 h-3 bg-red-400 rounded-full';
+            lastUpdate.textContent = 'Sin conexión';
+            break;
+    }
+}
+
+function handleRealtimeUpdate(data) {
+    if (data.type === 'stats') {
+        updateStatistics(data.data);
+    } else if (data.type === 'apps') {
+        updateRecentApps(data.data);
+    } else if (data.type === 'activity') {
+        updateActivityLog(data.data);
+    }
+    
+    // Update last update time
+    document.getElementById('lastUpdate').textContent = 'Tiempo real - ' + new Date().toLocaleTimeString();
+}
+
+function startPeriodicUpdates() {
+    // Fallback to periodic updates if WebSocket fails
+    if (!refreshInterval) {
+        refreshInterval = setInterval(loadDashboardData, 10000); // Update every 10 seconds
+    }
+}
 
 // Load dashboard data
 async function loadDashboardData() {
     try {
+        const refreshIcon = document.getElementById('refreshIcon');
+        refreshIcon.classList.add('fa-spin');
+        
         // Load system stats
         const statsResponse = await axios.get('/api/v1/system/stats');
         const stats = statsResponse.data;
         
-        // Update statistics cards
-        document.getElementById('totalApps').textContent = stats.applications.total;
-        document.getElementById('activeApps').textContent = stats.applications.active;
-        document.getElementById('inactiveApps').textContent = stats.applications.inactive;
-        
-        // Update usage bars
-        const cpu = Math.round(stats.system.cpu_usage);
-        const memory = Math.round(stats.system.memory_usage);
-        const disk = Math.round(stats.system.disk_usage);
-        
-        document.getElementById('cpuUsage').textContent = cpu + '%';
-        updateProgressBar('cpuBar', cpu);
-        updateProgressBar('memoryBar', memory);
-        updateProgressBar('diskBar', disk);
+        updateStatistics(stats);
         
         // Load applications
         const appsResponse = await axios.get('/api/v1/applications');
         const apps = appsResponse.data.slice(0, 5); // Show only 5 recent apps
         
-        displayRecentApps(apps);
+        updateRecentApps(apps);
         
         // Load activity log
         try {
             const logsResponse = await axios.get('/api/v1/system/logs?limit=10');
-            displayActivityLog(logsResponse.data.logs || []);
+            updateActivityLog(logsResponse.data.logs || []);
         } catch (logError) {
             console.warn('Could not load activity log:', logError);
-            displayActivityLog([]);
+            updateActivityLog([]);
         }
         
-        // Update last update time
-        document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleTimeString();
+        // Update last update time if not using WebSocket
+        if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+            document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleTimeString();
+        }
+        
+        refreshIcon.classList.remove('fa-spin');
         
     } catch (error) {
         console.error('Error loading dashboard data:', error);
+        document.getElementById('refreshIcon').classList.remove('fa-spin');
         showAlert('Error al cargar los datos del dashboard', 'danger');
     }
 }
 
-function updateProgressBar(barId, percentage) {
+function updateStatistics(stats) {
+    // Update statistics cards
+    document.getElementById('totalApps').textContent = stats.applications.total;
+    document.getElementById('activeApps').textContent = stats.applications.active;
+    document.getElementById('inactiveApps').textContent = stats.applications.inactive;
+    
+    // Update usage bars and percentages
+    const cpu = Math.round(stats.system.cpu_usage || 0);
+    const memory = Math.round(stats.system.memory_usage || 0);
+    const disk = Math.round(stats.system.disk_usage || 0);
+    
+    // CPU
+    document.getElementById('cpuUsage').textContent = cpu + '%';
+    document.getElementById('cpuPercentage').textContent = cpu + '%';
+    updateProgressBar('cpuBar', cpu, 'cpuText');
+    
+    // Memory
+    document.getElementById('memoryPercentage').textContent = memory + '%';
+    updateProgressBar('memoryBar', memory, 'memoryText');
+    
+    // Disk
+    document.getElementById('diskPercentage').textContent = disk + '%';
+    updateProgressBar('diskBar', disk, 'diskText');
+    
+    // Update additional info if available
+    if (stats.system.memory_total) {
+        const memUsed = ((stats.system.memory_total * memory) / 100 / (1024*1024*1024)).toFixed(1);
+        const memTotal = (stats.system.memory_total / (1024*1024*1024)).toFixed(1);
+        document.getElementById('memoryUsed').textContent = `${memUsed} GB usado`;
+        document.getElementById('memoryTotal').textContent = `de ${memTotal} GB`;
+    }
+    
+    if (stats.system.disk_total) {
+        const diskUsed = ((stats.system.disk_total * disk) / 100 / (1024*1024*1024)).toFixed(1);
+        const diskTotal = (stats.system.disk_total / (1024*1024*1024)).toFixed(1);
+        document.getElementById('diskUsed').textContent = `${diskUsed} GB usado`;
+        document.getElementById('diskTotal').textContent = `de ${diskTotal} GB`;
+    }
+    
+    if (stats.system.cpu_cores) {
+        document.getElementById('cpuCores').textContent = `${stats.system.cpu_cores} núcleos`;
+    }
+}
+        
+function updateProgressBar(barId, percentage, textId = null) {
     const bar = document.getElementById(barId);
-    bar.style.width = percentage + '%';
-    bar.textContent = percentage + '%';
+    const text = textId ? document.getElementById(textId) : null;
+    
+    // Animate the progress bar
+    setTimeout(() => {
+        bar.style.width = Math.min(percentage, 100) + '%';
+        if (text) {
+            text.textContent = percentage + '%';
+        } else {
+            bar.textContent = percentage + '%';
+        }
+    }, 100);
 }
 
-function displayRecentApps(apps) {
+function updateRecentApps(apps) {
     const tbody = document.getElementById('recentApps');
     
     if (!apps || apps.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                    <i class="fas fa-inbox mr-2"></i>No hay aplicaciones registradas
+                <td colspan="3" class="px-6 py-12 text-center text-gray-500">
+                    <div class="flex flex-col items-center space-y-2">
+                        <i class="fas fa-inbox text-3xl text-gray-400"></i>
+                        <span class="text-sm">No hay aplicaciones registradas</span>
+                    </div>
                 </td>
             </tr>`;
         return;
     }
     
     tbody.innerHTML = apps.map(app => `
-        <tr class="hover:bg-gray-50">
+        <tr class="hover:bg-gray-50 transition-colors duration-200">
             <td class="px-6 py-4">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0">
+                    <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                         <i class="fas fa-${getAppIcon(app.app_type)} text-blue-600"></i>
                     </div>
                     <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-900">${app.name}</div>
-                        <div class="text-sm text-gray-500">${app.domain}</div>
+                        <div class="text-sm font-semibold text-gray-900">${app.name}</div>
+                        <div class="text-xs text-gray-500 flex items-center mt-1">
+                            <i class="fas fa-globe mr-1"></i>
+                            ${app.domain}
+                        </div>
                     </div>
                 </div>
             </td>
             <td class="px-6 py-4">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(app.status)}">
-                    <i class="fas ${getStatusIcon(app.status)} mr-1"></i>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(app.status)}">
+                    <span class="w-2 h-2 ${getStatusDotClass(app.status)} rounded-full mr-2"></span>
                     ${getStatusText(app.status)}
                 </span>
             </td>
-            <td class="px-6 py-4 text-sm font-medium">
-                <div class="flex items-center space-x-2">
+            <td class="px-6 py-4">
+                <div class="flex items-center justify-end space-x-2">
                     ${app.status === 'active' 
-                        ? `<button class="text-red-600 hover:text-red-900 transition-colors" onclick="toggleApp(${app.id}, 'stop')" title="Detener">
-                               <i class="fas fa-stop"></i>
+                        ? `<button class="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all duration-200" 
+                               onclick="toggleApp(${app.id}, 'stop')" title="Detener">
+                               <i class="fas fa-stop text-sm"></i>
                            </button>`
-                        : `<button class="text-green-600 hover:text-green-900 transition-colors" onclick="toggleApp(${app.id}, 'start')" title="Iniciar">
-                               <i class="fas fa-play"></i>
+                        : `<button class="text-green-600 hover:text-green-700 hover:bg-green-50 p-2 rounded-lg transition-all duration-200" 
+                               onclick="toggleApp(${app.id}, 'start')" title="Iniciar">
+                               <i class="fas fa-play text-sm"></i>
                            </button>`
                     }
-                    <button class="text-blue-600 hover:text-blue-900 transition-colors" onclick="window.open('http://${app.domain}', '_blank')" title="Visitar">
-                        <i class="fas fa-external-link-alt"></i>
+                    <button class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition-all duration-200" 
+                            onclick="window.open('http://${app.domain}', '_blank')" title="Visitar sitio">
+                        <i class="fas fa-external-link-alt text-sm"></i>
                     </button>
                 </div>
             </td>
@@ -276,25 +478,31 @@ function displayRecentApps(apps) {
     `).join('');
 }
 
-function displayActivityLog(logs) {
+function updateActivityLog(logs) {
     const logContainer = document.getElementById('activityLog');
     
     if (!logs || logs.length === 0) {
         logContainer.innerHTML = `
-            <div class="text-center text-gray-500 py-8">
-                <i class="fas fa-inbox mr-2"></i>No hay actividad reciente
+            <div class="text-center text-gray-500 py-12">
+                <div class="flex flex-col items-center space-y-2">
+                    <i class="fas fa-inbox text-3xl text-gray-400"></i>
+                    <span class="text-sm">No hay actividad reciente</span>
+                </div>
             </div>`;
         return;
     }
     
     logContainer.innerHTML = logs.map(log => `
-        <div class="flex mb-4 last:mb-0">
-            <div class="flex-shrink-0">
-                <i class="fas ${getLogIcon(log.level)} text-${getLogColor(log.level)}"></i>
+        <div class="flex items-start space-x-3 mb-4 last:mb-0 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full ${getLogBgClass(log.level)} flex items-center justify-center">
+                <i class="fas ${getLogIcon(log.level)} text-sm text-white"></i>
             </div>
-            <div class="ml-3 flex-1">
-                <div class="text-sm font-medium text-gray-900">${log.message}</div>
-                <div class="text-sm text-gray-500">${formatDateTime(log.timestamp)}</div>
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900 mb-1">${log.message}</div>
+                <div class="text-xs text-gray-500 flex items-center">
+                    <i class="fas fa-clock mr-1"></i>
+                    ${formatDateTime(log.timestamp)}
+                </div>
             </div>
         </div>
     `).join('');
@@ -307,17 +515,33 @@ function getAppIcon(appType) {
         'nodejs': 'node-js',
         'static': 'file-alt',
         'react': 'react',
-        'vue': 'vuejs'
+        'vue': 'vuejs',
+        'angular': 'angular',
+        'django': 'python',
+        'flask': 'flask'
     };
     return icons[appType] || 'cube';
 }
 
 function getStatusBadgeClass(status) {
     switch (status) {
-        case 'active': return 'bg-green-100 text-green-800';
-        case 'inactive': return 'bg-gray-100 text-gray-800';
-        case 'error': return 'bg-red-100 text-red-800';
-        default: return 'bg-yellow-100 text-yellow-800';
+        case 'active': return 'bg-green-100 text-green-800 border border-green-200';
+        case 'inactive': return 'bg-gray-100 text-gray-800 border border-gray-200';
+        case 'error': return 'bg-red-100 text-red-800 border border-red-200';
+        case 'starting': return 'bg-blue-100 text-blue-800 border border-blue-200';
+        case 'stopping': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+        default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+    }
+}
+
+function getStatusDotClass(status) {
+    switch (status) {
+        case 'active': return 'bg-green-500';
+        case 'inactive': return 'bg-gray-400';
+        case 'error': return 'bg-red-500';
+        case 'starting': return 'bg-blue-500 animate-pulse';
+        case 'stopping': return 'bg-yellow-500 animate-pulse';
+        default: return 'bg-gray-400';
     }
 }
 
@@ -326,6 +550,8 @@ function getStatusIcon(status) {
         case 'active': return 'fa-play-circle';
         case 'inactive': return 'fa-pause-circle';
         case 'error': return 'fa-exclamation-triangle';
+        case 'starting': return 'fa-spinner fa-spin';
+        case 'stopping': return 'fa-stop-circle';
         default: return 'fa-question-circle';
     }
 }
@@ -335,39 +561,79 @@ function getStatusText(status) {
         case 'active': return 'Activa';
         case 'inactive': return 'Inactiva';
         case 'error': return 'Error';
+        case 'starting': return 'Iniciando';
+        case 'stopping': return 'Deteniendo';
         default: return 'Desconocido';
     }
 }
 
 function getLogIcon(level) {
-    switch (level) {
+    switch (level?.toUpperCase()) {
         case 'ERROR': return 'fa-exclamation-triangle';
         case 'WARNING': return 'fa-exclamation-circle';
         case 'INFO': return 'fa-info-circle';
+        case 'SUCCESS': return 'fa-check-circle';
+        case 'DEBUG': return 'fa-bug';
         default: return 'fa-circle';
     }
 }
 
+function getLogBgClass(level) {
+    switch (level?.toUpperCase()) {
+        case 'ERROR': return 'bg-red-500';
+        case 'WARNING': return 'bg-yellow-500';
+        case 'INFO': return 'bg-blue-500';
+        case 'SUCCESS': return 'bg-green-500';
+        case 'DEBUG': return 'bg-purple-500';
+        default: return 'bg-gray-500';
+    }
+}
+
 function getLogColor(level) {
-    switch (level) {
+    switch (level?.toUpperCase()) {
         case 'ERROR': return 'red-500';
         case 'WARNING': return 'yellow-500';
         case 'INFO': return 'blue-500';
+        case 'SUCCESS': return 'green-500';
+        case 'DEBUG': return 'purple-500';
         default: return 'gray-500';
     }
 }
 
 function formatDateTime(timestamp) {
-    return new Date(timestamp).toLocaleString();
+    try {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000); // difference in seconds
+        
+        if (diff < 60) {
+            return 'Hace unos segundos';
+        } else if (diff < 3600) {
+            const minutes = Math.floor(diff / 60);
+            return `Hace ${minutes} minuto${minutes !== 1 ? 's' : ''}`;
+        } else if (diff < 86400) {
+            const hours = Math.floor(diff / 3600);
+            return `Hace ${hours} hora${hours !== 1 ? 's' : ''}`;
+        } else {
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+    } catch (error) {
+        return timestamp;
+    }
 }
 
 async function toggleApp(appId, action) {
     try {
-        await axios.post(`/api/v1/applications/${appId}/${action}`);
+        const response = await axios.post(`/api/v1/applications/${appId}/${action}`);
         showAlert(`Aplicación ${action === 'start' ? 'iniciada' : 'detenida'} correctamente`, 'success');
-        loadDashboardData(); // Refresh data
+        
+        // Refresh data immediately after action
+        loadDashboardData();
+        
     } catch (error) {
-        showAlert(`Error al ${action === 'start' ? 'iniciar' : 'detener'} la aplicación`, 'danger');
+        console.error('Error toggling app:', error);
+        const message = error.response?.data?.detail || `Error al ${action === 'start' ? 'iniciar' : 'detener'} la aplicación`;
+        showAlert(message, 'danger');
     }
 }
 
@@ -375,18 +641,33 @@ function refreshStats() {
     loadDashboardData();
 }
 
-function showAlert(message, type) {
+function showAlert(message, type = 'info') {
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.alert-notification');
+    existingAlerts.forEach(alert => alert.remove());
+    
     // Create alert element
     const alert = document.createElement('div');
-    const bgColor = type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700';
-    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle';
+    const bgColor = {
+        'success': 'bg-green-50 border-green-200 text-green-800',
+        'danger': 'bg-red-50 border-red-200 text-red-800',
+        'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+        'info': 'bg-blue-50 border-blue-200 text-blue-800'
+    }[type] || 'bg-blue-50 border-blue-200 text-blue-800';
     
-    alert.className = `${bgColor} border px-4 py-3 rounded-lg mb-4 relative`;
+    const icon = {
+        'success': 'fa-check-circle',
+        'danger': 'fa-exclamation-triangle',
+        'warning': 'fa-exclamation-circle',
+        'info': 'fa-info-circle'
+    }[type] || 'fa-info-circle';
+    
+    alert.className = `alert-notification ${bgColor} border px-4 py-3 rounded-lg mb-4 relative shadow-sm`;
     alert.innerHTML = `
         <div class="flex items-center">
             <i class="fas ${icon} mr-2"></i>
-            <span>${message}</span>
-            <button type="button" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+            <span class="font-medium">${message}</span>
+            <button type="button" class="absolute top-3 right-3 text-current opacity-50 hover:opacity-75 transition-opacity" onclick="this.parentElement.parentElement.remove()">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -399,23 +680,57 @@ function showAlert(message, type) {
     // Auto-remove after 5 seconds
     setTimeout(() => {
         if (alert.parentNode) {
-            alert.remove();
+            alert.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 500);
         }
     }, 5000);
 }
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
+    // Load initial data
     loadDashboardData();
     
-    // Set up auto-refresh every 30 seconds
-    refreshInterval = setInterval(loadDashboardData, 30000);
+    // Try to connect WebSocket for real-time updates
+    if (window.WebSocket) {
+        connectWebSocket();
+    } else {
+        // Fallback to periodic updates if WebSocket is not supported
+        console.warn('WebSocket not supported, using periodic updates');
+        startPeriodicUpdates();
+    }
 });
 
-// Clean up interval when page unloads
+// Clean up on page unload
 window.addEventListener('beforeunload', function() {
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.close();
+    }
     if (refreshInterval) {
         clearInterval(refreshInterval);
+    }
+});
+
+// Handle visibility change to pause/resume updates when tab is not visible
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        // Page is hidden, reduce update frequency
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            // Keep WebSocket but don't refresh UI as frequently
+        }
+    } else {
+        // Page is visible again, resume normal updates
+        if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+            startPeriodicUpdates();
+        }
+        loadDashboardData(); // Refresh immediately when page becomes visible
     }
 });
 </script>
