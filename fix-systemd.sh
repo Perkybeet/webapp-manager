@@ -45,7 +45,7 @@ fi
 log_info "Finding correct Python executable..."
 
 # Always resolve the Python executable to the real path (not symlink)
-local venv_python="$INSTALL_DIR/app/venv/bin/python"
+venv_python="$INSTALL_DIR/app/venv/bin/python"
 PYTHON_EXEC=""
 
 if [[ -L "$venv_python" ]]; then
