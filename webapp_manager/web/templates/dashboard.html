@@ -3,196 +3,170 @@
 {% block title %}Dashboard - WebApp Manager SAAS{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1 class="h3 mb-0">
-                <i class="fas fa-tachometer-alt me-2 text-primary"></i>
-                Dashboard
-            </h1>
-            <div>
-                <button class="btn btn-outline-primary me-2" onclick="refreshStats()">
-                    <i class="fas fa-sync-alt me-1"></i>Actualizar
-                </button>
-                <span class="badge bg-secondary" id="lastUpdate">Cargando...</span>
-            </div>
+<div class="mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+        <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+            <i class="fas fa-tachometer-alt mr-3 text-blue-600"></i>
+            Dashboard
+        </h1>
+        <div class="flex items-center space-x-3">
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2" onclick="refreshStats()">
+                <i class="fas fa-sync-alt"></i>
+                <span>Actualizar</span>
+            </button>
+            <span class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm" id="lastUpdate">Cargando...</span>
         </div>
     </div>
 </div>
 
 <!-- Statistics Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="card-title">Aplicaciones Totales</div>
-                        <div class="h2 mb-0" id="totalApps">--</div>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-cubes fa-2x opacity-75"></i>
-                    </div>
-                </div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-blue-100 text-sm font-medium">Aplicaciones Totales</div>
+                <div class="text-3xl font-bold" id="totalApps">--</div>
+            </div>
+            <div class="text-blue-200">
+                <i class="fas fa-cubes text-3xl opacity-75"></i>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="card-title">Apps Activas</div>
-                        <div class="h2 mb-0" id="activeApps">--</div>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-play-circle fa-2x opacity-75"></i>
-                    </div>
-                </div>
+    <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-green-100 text-sm font-medium">Apps Activas</div>
+                <div class="text-3xl font-bold" id="activeApps">--</div>
+            </div>
+            <div class="text-green-200">
+                <i class="fas fa-play-circle text-3xl opacity-75"></i>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="card-title">Apps Inactivas</div>
-                        <div class="h2 mb-0" id="inactiveApps">--</div>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-pause-circle fa-2x opacity-75"></i>
-                    </div>
-                </div>
+    <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-yellow-100 text-sm font-medium">Apps Inactivas</div>
+                <div class="text-3xl font-bold" id="inactiveApps">--</div>
+            </div>
+            <div class="text-yellow-200">
+                <i class="fas fa-pause-circle text-3xl opacity-75"></i>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="card-title">Uso de CPU</div>
-                        <div class="h2 mb-0" id="cpuUsage">--%</div>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-microchip fa-2x opacity-75"></i>
-                    </div>
-                </div>
+    <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-purple-100 text-sm font-medium">Uso de CPU</div>
+                <div class="text-3xl font-bold" id="cpuUsage">--%</div>
+            </div>
+            <div class="text-purple-200">
+                <i class="fas fa-microchip text-3xl opacity-75"></i>
             </div>
         </div>
     </div>
 </div>
 
 <!-- System Usage -->
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-microchip me-2"></i>Uso de CPU
-                </h5>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-microchip mr-2 text-blue-600"></i>Uso de CPU
+            </h5>
+        </div>
+        <div class="relative">
+            <div class="bg-gray-200 rounded-full h-6 mb-2">
+                <div class="bg-blue-600 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-sm font-medium" 
+                     style="width: 0%" id="cpuBar">0%</div>
             </div>
-            <div class="card-body">
-                <div class="progress mb-2" style="height: 20px;">
-                    <div class="progress-bar bg-info" role="progressbar" 
-                         style="width: 0%" id="cpuBar">0%</div>
-                </div>
-                <small class="text-muted">Promedio del sistema</small>
+            <small class="text-gray-500">Promedio del sistema</small>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-memory mr-2 text-yellow-600"></i>Uso de Memoria
+            </h5>
+        </div>
+        <div class="relative">
+            <div class="bg-gray-200 rounded-full h-6 mb-2">
+                <div class="bg-yellow-500 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-sm font-medium" 
+                     style="width: 0%" id="memoryBar">0%</div>
+            </div>
+            <small class="text-gray-500">RAM utilizada</small>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-hdd mr-2 text-red-600"></i>Uso de Disco
+            </h5>
+        </div>
+        <div class="relative">
+            <div class="bg-gray-200 rounded-full h-6 mb-2">
+                <div class="bg-red-500 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-sm font-medium" 
+                     style="width: 0%" id="diskBar">0%</div>
+            </div>
+            <small class="text-gray-500">Almacenamiento usado</small>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Applications and Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-lg shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-list mr-2 text-blue-600"></i>Aplicaciones Recientes
+                </h5>
+                <a href="/domains" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Ver todas</a>
+            </div>
+        </div>
+        <div class="p-0">
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentApps" class="bg-white divide-y divide-gray-200">
+                        <!-- Apps will be loaded here -->
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Cargando aplicaciones...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-memory me-2"></i>Uso de Memoria
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="progress mb-2" style="height: 20px;">
-                    <div class="progress-bar bg-warning" role="progressbar" 
-                         style="width: 0%" id="memoryBar">0%</div>
-                </div>
-                <small class="text-muted">RAM utilizada</small>
-            </div>
+    <div class="bg-white rounded-lg shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-history mr-2 text-green-600"></i>Actividad Reciente
+            </h5>
         </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-hdd me-2"></i>Uso de Disco
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="progress mb-2" style="height: 20px;">
-                    <div class="progress-bar bg-danger" role="progressbar" 
-                         style="width: 0%" id="diskBar">0%</div>
-                </div>
-                <small class="text-muted">Almacenamiento usado</small>
+        <div class="p-6 max-h-96 overflow-y-auto" id="activityLog">
+            <!-- Activity will be loaded here -->
+            <div class="text-center text-gray-500 py-8">
+                <i class="fas fa-spinner fa-spin mr-2"></i>Cargando actividad...
             </div>
         </div>
     </div>
 </div>
 
-<!-- Recent Applications -->
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-list me-2"></i>Aplicaciones Recientes
-                </h5>
-                <a href="/domains" class="btn btn-sm btn-primary">Ver Todas</a>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Dominio</th>
-                                <th>Tipo</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recentApps">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted py-4">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando aplicaciones...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-clock me-2"></i>Actividad Reciente
-                </h5>
-            </div>
-            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                <div id="activityLog">
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-spinner fa-spin me-2"></i>Cargando actividad...
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -207,14 +181,14 @@ async function loadDashboardData() {
         const stats = statsResponse.data;
         
         // Update statistics cards
-        document.getElementById('totalApps').textContent = stats.total_applications;
-        document.getElementById('activeApps').textContent = stats.active_applications;
-        document.getElementById('inactiveApps').textContent = stats.inactive_applications;
+        document.getElementById('totalApps').textContent = stats.applications.total;
+        document.getElementById('activeApps').textContent = stats.applications.active;
+        document.getElementById('inactiveApps').textContent = stats.applications.inactive;
         
         // Update usage bars
-        const cpu = Math.round(stats.system_usage.cpu_usage);
-        const memory = Math.round(stats.system_usage.memory_usage);
-        const disk = Math.round(stats.system_usage.disk_usage);
+        const cpu = Math.round(stats.system.cpu_usage);
+        const memory = Math.round(stats.system.memory_usage);
+        const disk = Math.round(stats.system.disk_usage);
         
         document.getElementById('cpuUsage').textContent = cpu + '%';
         updateProgressBar('cpuBar', cpu);
@@ -228,8 +202,13 @@ async function loadDashboardData() {
         displayRecentApps(apps);
         
         // Load activity log
-        const logsResponse = await axios.get('/api/v1/system/logs?limit=10');
-        displayActivityLog(logsResponse.data.logs);
+        try {
+            const logsResponse = await axios.get('/api/v1/system/logs?limit=10');
+            displayActivityLog(logsResponse.data.logs || []);
+        } catch (logError) {
+            console.warn('Could not load activity log:', logError);
+            displayActivityLog([]);
+        }
         
         // Update last update time
         document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleTimeString();
@@ -249,44 +228,47 @@ function updateProgressBar(barId, percentage) {
 function displayRecentApps(apps) {
     const tbody = document.getElementById('recentApps');
     
-    if (apps.length === 0) {
+    if (!apps || apps.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="text-center text-muted py-4">
-                    <i class="fas fa-inbox me-2"></i>No hay aplicaciones
+                <td colspan="3" class="px-6 py-8 text-center text-gray-500">
+                    <i class="fas fa-inbox mr-2"></i>No hay aplicaciones registradas
                 </td>
             </tr>`;
         return;
     }
     
     tbody.innerHTML = apps.map(app => `
-        <tr>
-            <td>
-                <strong>${app.name}</strong>
+        <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-${getAppIcon(app.app_type)} text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-900">${app.name}</div>
+                        <div class="text-sm text-gray-500">${app.domain}</div>
+                    </div>
+                </div>
             </td>
-            <td>
-                <a href="https://${app.domain}" target="_blank" class="text-decoration-none">
-                    ${app.domain} <i class="fas fa-external-link-alt ms-1 text-muted small"></i>
-                </a>
-            </td>
-            <td>
-                <span class="badge bg-secondary">${app.app_type}</span>
-            </td>
-            <td>
-                <span class="badge ${getStatusBadgeClass(app.status)}">
-                    <i class="fas ${getStatusIcon(app.status)} me-1"></i>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(app.status)}">
+                    <i class="fas ${getStatusIcon(app.status)} mr-1"></i>
                     ${getStatusText(app.status)}
                 </span>
             </td>
-            <td>
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-success" onclick="toggleApp(${app.id}, 'start')" 
-                            ${app.status === 'active' ? 'disabled' : ''}>
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button class="btn btn-outline-warning" onclick="toggleApp(${app.id}, 'stop')"
-                            ${app.status === 'inactive' ? 'disabled' : ''}>
-                        <i class="fas fa-stop"></i>
+            <td class="px-6 py-4 text-sm font-medium">
+                <div class="flex items-center space-x-2">
+                    ${app.status === 'active' 
+                        ? `<button class="text-red-600 hover:text-red-900 transition-colors" onclick="toggleApp(${app.id}, 'stop')" title="Detener">
+                               <i class="fas fa-stop"></i>
+                           </button>`
+                        : `<button class="text-green-600 hover:text-green-900 transition-colors" onclick="toggleApp(${app.id}, 'start')" title="Iniciar">
+                               <i class="fas fa-play"></i>
+                           </button>`
+                    }
+                    <button class="text-blue-600 hover:text-blue-900 transition-colors" onclick="window.open('http://${app.domain}', '_blank')" title="Visitar">
+                        <i class="fas fa-external-link-alt"></i>
                     </button>
                 </div>
             </td>
@@ -297,33 +279,45 @@ function displayRecentApps(apps) {
 function displayActivityLog(logs) {
     const logContainer = document.getElementById('activityLog');
     
-    if (logs.length === 0) {
+    if (!logs || logs.length === 0) {
         logContainer.innerHTML = `
-            <div class="text-center text-muted py-4">
-                <i class="fas fa-inbox me-2"></i>No hay actividad reciente
+            <div class="text-center text-gray-500 py-8">
+                <i class="fas fa-inbox mr-2"></i>No hay actividad reciente
             </div>`;
         return;
     }
     
     logContainer.innerHTML = logs.map(log => `
-        <div class="d-flex mb-3">
+        <div class="flex mb-4 last:mb-0">
             <div class="flex-shrink-0">
                 <i class="fas ${getLogIcon(log.level)} text-${getLogColor(log.level)}"></i>
             </div>
-            <div class="flex-grow-1 ms-3">
-                <div class="fw-bold">${log.message}</div>
-                <small class="text-muted">${formatDateTime(log.timestamp)}</small>
+            <div class="ml-3 flex-1">
+                <div class="text-sm font-medium text-gray-900">${log.message}</div>
+                <div class="text-sm text-gray-500">${formatDateTime(log.timestamp)}</div>
             </div>
         </div>
     `).join('');
 }
 
+function getAppIcon(appType) {
+    const icons = {
+        'fastapi': 'rocket',
+        'nextjs': 'react',
+        'nodejs': 'node-js',
+        'static': 'file-alt',
+        'react': 'react',
+        'vue': 'vuejs'
+    };
+    return icons[appType] || 'cube';
+}
+
 function getStatusBadgeClass(status) {
     switch (status) {
-        case 'active': return 'bg-success';
-        case 'inactive': return 'bg-secondary';
-        case 'error': return 'bg-danger';
-        default: return 'bg-warning';
+        case 'active': return 'bg-green-100 text-green-800';
+        case 'inactive': return 'bg-gray-100 text-gray-800';
+        case 'error': return 'bg-red-100 text-red-800';
+        default: return 'bg-yellow-100 text-yellow-800';
     }
 }
 
@@ -356,10 +350,10 @@ function getLogIcon(level) {
 
 function getLogColor(level) {
     switch (level) {
-        case 'ERROR': return 'danger';
-        case 'WARNING': return 'warning';
-        case 'INFO': return 'info';
-        default: return 'secondary';
+        case 'ERROR': return 'red-500';
+        case 'WARNING': return 'yellow-500';
+        case 'INFO': return 'blue-500';
+        default: return 'gray-500';
     }
 }
 
@@ -384,11 +378,18 @@ function refreshStats() {
 function showAlert(message, type) {
     // Create alert element
     const alert = document.createElement('div');
-    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    const bgColor = type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle';
+    
+    alert.className = `${bgColor} border px-4 py-3 rounded-lg mb-4 relative`;
     alert.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-2"></i>
+            <span>${message}</span>
+            <button type="button" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     `;
     
     // Insert at the beginning of main content
