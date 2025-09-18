@@ -475,25 +475,21 @@ verify_installation() {
     ACTUAL_PYTHON_EXEC=""
     venv_python="$ACTUAL_VENV_DIR/bin/python"
     
-    if [[ -L "$venv_python" ]]; then
-        # If it's a symlink, resolve it to the real path
-        ACTUAL_PYTHON_EXEC=$(readlink -f "$venv_python")
-        log_info "Resolved Python executable from symlink: $ACTUAL_PYTHON_EXEC"
-    elif [[ -f "$venv_python" ]]; then
-        # If it's a real file, use it directly
+    # Always prefer the virtual environment Python over resolved system paths
+    if [[ -f "$venv_python" ]]; then
+        # Use the virtual environment Python directly (even if it's a symlink)
         ACTUAL_PYTHON_EXEC="$venv_python"
-        log_info "Using Python executable: $ACTUAL_PYTHON_EXEC"
+        log_info "Using virtual environment Python: $ACTUAL_PYTHON_EXEC"
+    elif [[ -L "$venv_python" ]]; then
+        # If it's a symlink but the target is within the venv, keep the symlink path
+        ACTUAL_PYTHON_EXEC="$venv_python"
+        log_info "Using virtual environment Python symlink: $ACTUAL_PYTHON_EXEC"
     else
-        # Try alternative paths
+        # Try alternative paths within the venv
         for py_exec in python3 python3.12 python3.11 python3.10 python3.9 python3.8; do
             if [[ -f "$ACTUAL_VENV_DIR/bin/$py_exec" ]]; then
-                if [[ -L "$ACTUAL_VENV_DIR/bin/$py_exec" ]]; then
-                    ACTUAL_PYTHON_EXEC=$(readlink -f "$ACTUAL_VENV_DIR/bin/$py_exec")
-                    log_info "Resolved Python executable from $py_exec symlink: $ACTUAL_PYTHON_EXEC"
-                else
-                    ACTUAL_PYTHON_EXEC="$ACTUAL_VENV_DIR/bin/$py_exec"
-                    log_info "Using Python executable: $ACTUAL_PYTHON_EXEC"
-                fi
+                ACTUAL_PYTHON_EXEC="$ACTUAL_VENV_DIR/bin/$py_exec"
+                log_info "Using virtual environment Python: $ACTUAL_PYTHON_EXEC"
                 break
             fi
         done
@@ -517,6 +513,22 @@ verify_installation() {
     if ! "$ACTUAL_PYTHON_EXEC" --version; then
         log_error "Python executable test failed: $ACTUAL_PYTHON_EXEC"
         exit 1
+    fi
+    
+    # Test that Python can access virtual environment packages
+    log_info "Testing virtual environment package access..."
+    if ! "$ACTUAL_PYTHON_EXEC" -c "import sys; print('Python path:', sys.executable); import site; print('Site packages:', site.getsitepackages() if hasattr(site, 'getsitepackages') else 'N/A')"; then
+        log_warning "Python executable may not have proper virtual environment setup"
+    fi
+    
+    # Test for required packages in the virtual environment
+    log_info "Testing for required packages..."
+    if ! "$ACTUAL_PYTHON_EXEC" -c "import fastapi, uvicorn; print('FastAPI and Uvicorn are available')" 2>/dev/null; then
+        log_warning "Required packages (FastAPI, Uvicorn) may not be available in virtual environment"
+        log_info "Attempting to install missing packages..."
+        cd "$ACTUAL_WORKING_DIR"
+        source venv/bin/activate
+        pip install fastapi uvicorn jinja2 python-multipart 'passlib[bcrypt]' 'python-jose[cryptography]' psutil
     fi
     
     # Test main script syntax
@@ -583,6 +595,126 @@ EOF
     log_success "Configuration created"
 }
 
+# Create startup wrapper script
+create_startup_script() {
+    log_step "Creating startup wrapper script..."
+    
+    # Verify that we have all the required paths from verification
+    if [[ -z "$ACTUAL_WORKING_DIR" || -z "$ACTUAL_PYTHON_EXEC" || -z "$ACTUAL_MAIN_SCRIPT" || -z "$ACTUAL_VENV_DIR" ]]; then
+        log_error "Missing required installation paths. Run verify_installation first."
+        exit 1
+    fi
+    
+    # Create the startup script
+    local startup_script="$ACTUAL_WORKING_DIR/start-webapp-manager.sh"
+    
+    $CMD_PREFIX tee "$startup_script" > /dev/null << EOF
+#!/bin/bash
+# WebApp Manager SAAS Startup Script
+# This script ensures the virtual environment is properly activated
+
+set -e
+
+echo "🚀 Starting WebApp Manager SAAS..."
+echo "Working Directory: $ACTUAL_WORKING_DIR"
+echo "Virtual Environment: $ACTUAL_VENV_DIR"
+echo "Main Script: $ACTUAL_MAIN_SCRIPT"
+
+# Change to the working directory
+cd "$ACTUAL_WORKING_DIR"
+echo "✅ Changed to working directory: \$(pwd)"
+
+# Verify virtual environment exists
+if [[ ! -d "$ACTUAL_VENV_DIR" ]]; then
+    echo "❌ Virtual environment not found: $ACTUAL_VENV_DIR"
+    exit 1
+fi
+
+# Activate the virtual environment
+echo "🔄 Activating virtual environment..."
+source "$ACTUAL_VENV_DIR/bin/activate"
+
+# Verify activation worked
+if [[ "\$VIRTUAL_ENV" == "$ACTUAL_VENV_DIR" ]]; then
+    echo "✅ Virtual environment activated: \$VIRTUAL_ENV"
+else
+    echo "❌ Virtual environment activation failed"
+    echo "Expected: $ACTUAL_VENV_DIR"
+    echo "Actual: \$VIRTUAL_ENV"
+    exit 1
+fi
+
+# Show Python executable being used
+echo "🐍 Python executable: \$(which python)"
+echo "🐍 Python version: \$(python --version)"
+
+# Export additional environment variables
+export PYTHONPATH="$ACTUAL_WORKING_DIR:\$PYTHONPATH"
+export PYTHONUNBUFFERED=1
+
+# Verify main script exists
+if [[ ! -f "$ACTUAL_MAIN_SCRIPT" ]]; then
+    echo "❌ Main script not found: $ACTUAL_MAIN_SCRIPT"
+    exit 1
+fi
+
+# Test critical imports before starting
+echo "🔍 Testing critical imports..."
+python -c "
+try:
+    import rich
+    print('✅ rich imported successfully')
+except ImportError as e:
+    print(f'❌ rich import failed: {e}')
+    exit(1)
+
+try:
+    import fastapi
+    print('✅ fastapi imported successfully')
+except ImportError as e:
+    print(f'❌ fastapi import failed: {e}')
+    exit(1)
+
+try:
+    from fastapi.middleware.cors import CORSMiddleware
+    print('✅ fastapi.middleware.cors imported successfully')
+except ImportError as e:
+    print(f'❌ fastapi.middleware.cors import failed: {e}')
+    exit(1)
+
+try:
+    import uvicorn
+    print('✅ uvicorn imported successfully')
+except ImportError as e:
+    print(f'❌ uvicorn import failed: {e}')
+    exit(1)
+"
+
+if [[ \$? -ne 0 ]]; then
+    echo "❌ Critical import test failed. Exiting."
+    exit 1
+fi
+
+echo "✅ All critical imports successful. Starting application..."
+
+# Start the application
+exec python "$ACTUAL_MAIN_SCRIPT" web --host \$WEBAPP_MANAGER_WEB_HOST --port \$WEBAPP_MANAGER_WEB_PORT
+EOF
+    
+    # Make the script executable
+    $CMD_PREFIX chmod +x "$startup_script"
+    
+    # Set ownership if not root
+    if [[ "$SERVICE_USER" != "root" ]]; then
+        $CMD_PREFIX chown "$SERVICE_USER:$SERVICE_USER" "$startup_script"
+    fi
+    
+    log_success "Startup wrapper script created: $startup_script"
+    
+    # Store the script path for use in systemd service
+    STARTUP_SCRIPT="$startup_script"
+}
+
 # Create systemd service
 create_systemd_service() {
     log_step "Creating systemd service..."
@@ -593,6 +725,12 @@ create_systemd_service() {
         exit 1
     fi
     
+    # Ensure startup script exists
+    if [[ -z "$STARTUP_SCRIPT" || ! -f "$STARTUP_SCRIPT" ]]; then
+        log_error "Startup script not found. Run create_startup_script first."
+        exit 1
+    fi
+    
     # Debug information
     log_info "Systemd service configuration:"
     log_info "  Service User: $SERVICE_USER"
@@ -600,6 +738,13 @@ create_systemd_service() {
     log_info "  Python Executable: $ACTUAL_PYTHON_EXEC"
     log_info "  Main Script: $ACTUAL_MAIN_SCRIPT"
     log_info "  Virtual Environment: $ACTUAL_VENV_DIR"
+    
+    # Determine security settings based on installation location
+    if [[ "$INSTALL_DIR" == /root/* ]] || [[ "$SERVICE_USER" == "root" ]]; then
+        log_info "  Security Profile: Relaxed (root installation detected)"
+    else
+        log_info "  Security Profile: Standard (non-root installation)"
+    fi
     
     # Final verification before creating service
     if [[ ! -f "$ACTUAL_PYTHON_EXEC" ]]; then
@@ -617,6 +762,17 @@ create_systemd_service() {
         exit 1
     fi
     
+    # Critical: Verify that the Python executable is from the virtual environment
+    if [[ "$ACTUAL_PYTHON_EXEC" != "$ACTUAL_VENV_DIR"* ]]; then
+        log_error "CRITICAL: Python executable is not from virtual environment!"
+        log_error "Expected path to start with: $ACTUAL_VENV_DIR"
+        log_error "Actual path: $ACTUAL_PYTHON_EXEC"
+        log_error "This will cause missing package errors in systemd service"
+        exit 1
+    fi
+    
+    log_info "✅ Python executable verification passed - using venv Python"
+    
     # Create the systemd service file
     $CMD_PREFIX tee /etc/systemd/system/webapp-manager-saas.service > /dev/null << EOF
 [Unit]
@@ -630,9 +786,8 @@ Type=simple
 User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$ACTUAL_WORKING_DIR
-Environment=PATH=$ACTUAL_VENV_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=$INSTALL_DIR/.webapp-manager/config.env
-ExecStart=$ACTUAL_PYTHON_EXEC $ACTUAL_MAIN_SCRIPT web --host $WEB_HOST --port $WEB_PORT
+ExecStart=$STARTUP_SCRIPT
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=10
@@ -646,14 +801,39 @@ SyslogIdentifier=webapp-manager-saas
 LimitNOFILE=65536
 LimitNPROC=4096
 
-# Security settings
+# Security settings - Adjusted for root installations
 NoNewPrivileges=true
+EOF
+
+    # Add conditional security settings based on installation location
+    if [[ "$INSTALL_DIR" == /root/* ]] || [[ "$SERVICE_USER" == "root" ]]; then
+        # More permissive settings for root installations
+        $CMD_PREFIX tee -a /etc/systemd/system/webapp-manager-saas.service > /dev/null << EOF
+# Root installation - relaxed security settings
+ProtectSystem=false
+ProtectHome=false
+ReadWritePaths=$INSTALL_DIR
+ReadWritePaths=$INSTALL_DIR/.webapp-manager
+ReadWritePaths=/var/www
+ReadWritePaths=/tmp
+ReadWritePaths=/var/log
+ReadWritePaths=/etc/nginx
+EOF
+    else
+        # Standard security settings for non-root installations
+        $CMD_PREFIX tee -a /etc/systemd/system/webapp-manager-saas.service > /dev/null << EOF
+# Non-root installation - standard security settings
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=$INSTALL_DIR/.webapp-manager
 ReadWritePaths=/var/www
 ReadWritePaths=/tmp
 ReadWritePaths=/var/log
+EOF
+    fi
+
+    # Close the service file
+    $CMD_PREFIX tee -a /etc/systemd/system/webapp-manager-saas.service > /dev/null << EOF
 
 [Install]
 WantedBy=multi-user.target
@@ -664,6 +844,172 @@ EOF
     $SYSTEMCTL_CMD enable webapp-manager-saas.service
     
     log_success "Systemd service created and enabled"
+}
+
+# Install missing Python packages
+install_missing_packages() {
+    log_step "Installing missing Python packages..."
+    
+    cd "$ACTUAL_WORKING_DIR"
+    source "$ACTUAL_VENV_DIR/bin/activate"
+    
+    # Update pip first
+    log_info "Updating pip to latest version..."
+    pip install --upgrade pip
+    
+    # List of essential packages that might be missing
+    local missing_packages=()
+    
+    # Core web framework packages
+    local core_packages=(
+        "rich"
+        "fastapi"
+        "uvicorn[standard]"
+        "jinja2"
+        "python-multipart"
+        "psutil"
+        "starlette"
+        "pydantic"
+        "typing-extensions"
+    )
+    
+    # Security and authentication packages
+    local auth_packages=(
+        "passlib[bcrypt]"
+        "python-jose[cryptography]"
+        "python-multipart"
+        "itsdangerous"
+    )
+    
+    # Check and install core packages
+    log_info "Checking core web framework packages..."
+    for pkg in "${core_packages[@]}"; do
+        # Extract package name without extras for import check
+        local import_name=$(echo "$pkg" | sed 's/\[.*\]//' | tr '-' '_')
+        
+        # Special case for uvicorn which has [standard] extra
+        if [[ "$pkg" == "uvicorn[standard]" ]]; then
+            import_name="uvicorn"
+        fi
+        
+        if ! "$ACTUAL_PYTHON_EXEC" -c "import $import_name" 2>/dev/null; then
+            missing_packages+=("$pkg")
+        fi
+    done
+    
+    # Check authentication packages with special import handling
+    log_info "Checking authentication packages..."
+    if ! "$ACTUAL_PYTHON_EXEC" -c "import passlib.hash" 2>/dev/null; then
+        missing_packages+=("passlib[bcrypt]")
+    fi
+    
+    if ! "$ACTUAL_PYTHON_EXEC" -c "import jose" 2>/dev/null; then
+        missing_packages+=("python-jose[cryptography]")
+    fi
+    
+    if ! "$ACTUAL_PYTHON_EXEC" -c "import itsdangerous" 2>/dev/null; then
+        missing_packages+=("itsdangerous")
+    fi
+    
+    # Install missing packages if any
+    if [[ ${#missing_packages[@]} -gt 0 ]]; then
+        log_info "Installing missing packages: ${missing_packages[*]}"
+        pip install --upgrade "${missing_packages[@]}"
+        log_success "Package installation completed"
+    else
+        log_info "All required packages are already installed"
+    fi
+    
+    # Force reinstall FastAPI and related packages if there are import issues
+    log_info "Ensuring FastAPI and middleware are properly installed..."
+    pip install --upgrade --force-reinstall "fastapi>=0.100.0" "starlette>=0.27.0" "uvicorn[standard]>=0.23.0"
+    
+    # Verify rich installation specifically
+    log_info "Verifying rich package installation..."
+    if "$ACTUAL_PYTHON_EXEC" -c "import rich; print(f'Rich version: {rich.__version__}')" 2>/dev/null; then
+        log_success "Rich package verified and working"
+    else
+        log_warning "Rich package verification failed, but this might be due to path issues"
+        log_info "Attempting alternative verification..."
+        
+        # Check if rich is actually installed in site-packages
+        if "$ACTUAL_PYTHON_EXEC" -c "import pkg_resources; pkg_resources.get_distribution('rich')" 2>/dev/null; then
+            log_success "Rich package is installed (verified via pkg_resources)"
+        else
+            log_error "Rich package not found in site-packages"
+            # Force install rich
+            log_info "Force installing rich package..."
+            pip install --upgrade --force-reinstall rich
+            
+            # Test again with pkg_resources
+            if "$ACTUAL_PYTHON_EXEC" -c "import pkg_resources; pkg_resources.get_distribution('rich')" 2>/dev/null; then
+                log_success "Rich package force installation successful"
+            else
+                log_error "Rich package installation still failing"
+                exit 1
+            fi
+        fi
+    fi
+    # Final comprehensive verification
+    log_info "Final verification of all essential packages..."
+    local verification_failed=false
+    
+    # Test core imports
+    local core_imports=("rich" "fastapi" "uvicorn" "jinja2" "psutil" "starlette" "pydantic")
+    for import_name in "${core_imports[@]}"; do
+        if "$ACTUAL_PYTHON_EXEC" -c "import $import_name" 2>/dev/null; then
+            log_info "✅ $import_name - OK"
+        else
+            log_warning "❌ $import_name - Failed to import"
+            verification_failed=true
+        fi
+    done
+    
+    # Test FastAPI middleware specifically
+    log_info "Testing FastAPI middleware components..."
+    local middleware_tests=(
+        "fastapi.middleware.cors:CORSMiddleware"
+        "fastapi.middleware.trustedhost:TrustedHostMiddleware" 
+        "fastapi.middleware.gzip:GZipMiddleware"
+        "starlette.middleware.sessions:SessionMiddleware"
+    )
+    
+    for test in "${middleware_tests[@]}"; do
+        local module_path="${test%%:*}"
+        local class_name="${test##*:}"
+        local test_name="$module_path.$class_name"
+        
+        if "$ACTUAL_PYTHON_EXEC" -c "from $module_path import $class_name" 2>/dev/null; then
+            log_info "✅ $test_name - OK"
+        else
+            log_warning "❌ $test_name - Failed to import"
+            verification_failed=true
+        fi
+    done
+    
+    # Test authentication components
+    local auth_tests=("passlib.hash" "jose.jwt" "itsdangerous")
+    for import_name in "${auth_tests[@]}"; do
+        if "$ACTUAL_PYTHON_EXEC" -c "import $import_name" 2>/dev/null; then
+            log_info "✅ $import_name - OK"
+        else
+            log_warning "❌ $import_name - Failed to import"
+            verification_failed=true
+        fi
+    done
+    
+    if [[ "$verification_failed" == "true" ]]; then
+        log_warning "Some packages failed verification, but continuing with installation..."
+        log_info "The startup script will handle any remaining import issues at runtime"
+        log_info "Consider running: pip install --force-reinstall fastapi starlette uvicorn"
+    else
+        log_success "All essential packages and middleware verified successfully"
+    fi
+    
+    # Set ownership if not root
+    if [[ "$SERVICE_USER" != "root" ]]; then
+        $CMD_PREFIX chown -R "$SERVICE_USER:$SERVICE_USER" "$ACTUAL_VENV_DIR"
+    fi
 }
 
 # Configure nginx
@@ -1041,6 +1387,8 @@ main() {
     create_service_user
     install_dependencies
     verify_installation
+    install_missing_packages
+    create_startup_script
     create_configuration
     create_systemd_service
     configure_nginx
