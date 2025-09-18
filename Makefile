@@ -43,11 +43,13 @@ help:
 	@echo "  $(GREEN)fix-nodejs$(NC)        - Fix Node.js conflicts"
 	@echo "  $(GREEN)fix-line-endings$(NC)  - Fix Windows line endings"
 	@echo "  $(GREEN)install-complete$(NC)  - Complete installation (recommended)"
+	@echo "  $(GREEN)install-clean$(NC)     - Clean installation without pip"
 	@echo "  $(GREEN)install-with-pip$(NC)  - Install with pip override"
 	@echo "  $(GREEN)install-global$(NC)    - Install webapp-manager globally"
 	@echo "  $(GREEN)run$(NC)               - Run locally without installation"
 	@echo "  $(GREEN)create-alias$(NC)      - Create local alias"
 	@echo "  $(GREEN)uninstall-global$(NC)  - Remove global installation"
+	@echo "  $(GREEN)debug-install$(NC)     - Debug installation issues"
 	@echo ""
 
 # Create virtual environment
@@ -165,7 +167,17 @@ dev-setup: venv install-dev
 .PHONY: uninstall
 uninstall:
 	@echo "$(BLUE)Uninstalling package...$(NC)"
-	$(PIP) uninstall -y $(PACKAGE_NAME)
+	@if $(PIP) show $(PACKAGE_NAME) >/dev/null 2>&1; then \
+		echo "$(BLUE)Removing package with pip...$(NC)"; \
+		$(PIP) uninstall -y $(PACKAGE_NAME) 2>/dev/null || \
+		$(PIP) uninstall -y $(PACKAGE_NAME) --break-system-packages 2>/dev/null || \
+		echo "$(YELLOW)Could not uninstall with pip, continuing...$(NC)"; \
+	fi
+	@if [ -f /usr/local/bin/webapp-manager ]; then \
+		echo "$(BLUE)Removing global installation...$(NC)"; \
+		sudo rm -f /usr/local/bin/webapp-manager; \
+		sudo rm -rf /opt/webapp-manager; \
+	fi
 	@echo "$(GREEN)Package uninstalled successfully!$(NC)"
 
 # Install system dependencies (Ubuntu/Debian)
@@ -223,6 +235,15 @@ install-complete: fix-line-endings install-global
 	@echo "$(GREEN)Installation completed successfully!$(NC)"
 	@echo "$(YELLOW)Usage: webapp-manager --help$(NC)"
 
+# Clean installation without pip (for externally-managed environments)
+.PHONY: install-clean
+install-clean: fix-line-endings install-global
+	@echo "$(BLUE)Clean WebApp Manager installation (no pip)...$(NC)"
+	@echo "$(BLUE)Verifying installation...$(NC)"
+	webapp-manager --help || echo "$(YELLOW)Installation completed but command may need path adjustment$(NC)"
+	@echo "$(GREEN)Clean installation completed successfully!$(NC)"
+	@echo "$(YELLOW)Usage: webapp-manager --help$(NC)"
+
 # Alternative installation with pip override
 .PHONY: install-with-pip
 install-with-pip: fix-line-endings
@@ -255,10 +276,10 @@ install-global: check-root
 	sudo cp -r webapp_manager/ /opt/webapp-manager/
 	sudo cp webapp-manager.py /opt/webapp-manager/
 	sudo cp setup.py /opt/webapp-manager/ 2>/dev/null || true
+	sudo cp requirements.txt /opt/webapp-manager/ 2>/dev/null || true
 	@echo "$(BLUE)Creating global executable...$(NC)"
 	@echo '#!/bin/bash' | sudo tee /usr/local/bin/webapp-manager > /dev/null
-	@echo 'cd /opt/webapp-manager' | sudo tee -a /usr/local/bin/webapp-manager > /dev/null
-	@echo 'python3 webapp-manager.py "$$@"' | sudo tee -a /usr/local/bin/webapp-manager > /dev/null
+	@echo 'cd /opt/webapp-manager && python3 webapp-manager.py "$$@"' | sudo tee -a /usr/local/bin/webapp-manager > /dev/null
 	sudo chmod +x /usr/local/bin/webapp-manager
 	@echo "$(GREEN)webapp-manager installed globally!$(NC)"
 
@@ -268,6 +289,30 @@ uninstall-global: check-root
 	@echo "$(BLUE)Removing global installation...$(NC)"
 	rm -f /usr/local/bin/webapp-manager
 	@echo "$(GREEN)Global installation removed!$(NC)"
+
+# Debug installation
+.PHONY: debug-install
+debug-install:
+	@echo "$(BLUE)Debugging installation...$(NC)"
+	@echo "$(YELLOW)Checking if webapp-manager is installed...$(NC)"
+	@if [ -f /usr/local/bin/webapp-manager ]; then \
+		echo "$(GREEN)Found: /usr/local/bin/webapp-manager$(NC)"; \
+		echo "$(BLUE)Content:$(NC)"; \
+		cat /usr/local/bin/webapp-manager; \
+		echo "$(BLUE)Permissions:$(NC)"; \
+		ls -la /usr/local/bin/webapp-manager; \
+	else \
+		echo "$(RED)Not found: /usr/local/bin/webapp-manager$(NC)"; \
+	fi
+	@echo "$(YELLOW)Checking installation directory...$(NC)"
+	@if [ -d /opt/webapp-manager ]; then \
+		echo "$(GREEN)Found: /opt/webapp-manager$(NC)"; \
+		ls -la /opt/webapp-manager/; \
+	else \
+		echo "$(RED)Not found: /opt/webapp-manager$(NC)"; \
+	fi
+	@echo "$(YELLOW)Testing direct Python execution...$(NC)"
+	python3 webapp-manager.py --help || echo "$(RED)Direct execution failed$(NC)"
 
 # Development workflow
 .PHONY: dev

@@ -69,10 +69,13 @@ pip3 install pytest pytest-cov black flake8
 git clone <repository-url>
 cd webapp-manager
 
-# 2. Usar script de instalación automática con Dialog
-sudo bash install-dialog.sh
+# 2. Instalación completa automática
+make install-complete
 
-# 3. Verificar instalación
+# 3. Para entornos externally-managed (Python 3.11+)
+make install-clean
+
+# 4. Verificar instalación
 webapp-manager gui
 ```
 
@@ -279,6 +282,86 @@ Los logs se almacenan en:
 3. Commit cambios: `git commit -am 'Agregar nueva funcionalidad'`
 4. Push a la rama: `git push origin feature/nueva-funcionalidad`
 5. Crear Pull Request
+
+## 🔧 Resolución de Problemas
+
+### Error de Sintaxis en Instalación Global
+
+Si ves errores como:
+```
+SyntaxError: invalid syntax
+  python3 webapp-manager.py "$@"
+          ^^^^^^
+```
+
+**Solución:**
+```bash
+# 1. Desinstalar completamente
+make uninstall
+
+# 2. Usar instalación limpia (sin pip)
+make install-clean
+
+# 3. Verificar instalación
+make debug-install
+```
+
+### Entorno Externally-Managed (Python 3.11+)
+
+Si ves errores como:
+```
+error: externally-managed-environment
+```
+
+**Opciones de solución:**
+```bash
+# Opción 1: Instalación limpia (recomendada)
+make install-clean
+
+# Opción 2: Usar virtual environment
+python3 -m venv venv
+source venv/bin/activate
+make install
+
+# Opción 3: Forzar con --break-system-packages
+make install-with-pip
+```
+
+### Debug de Instalación
+
+```bash
+# Verificar estado de instalación
+make debug-install
+
+# Ejecutar directamente sin instalación
+make run ARGS="--help"
+
+# Crear alias local
+make create-alias
+source ~/.bashrc
+```
+
+### Problemas de Permisos
+
+```bash
+# Asegurar permisos correctos
+sudo chown -R www-data:www-data /var/www/apps
+sudo chmod 755 /usr/local/bin/webapp-manager
+sudo chmod -R 755 /opt/webapp-manager
+```
+
+### Verificación Post-Instalación
+
+```bash
+# Verificar comando disponible
+which webapp-manager
+
+# Verificar versión
+webapp-manager --version
+
+# Test básico
+webapp-manager list
+```
 
 ## Licencia
 
