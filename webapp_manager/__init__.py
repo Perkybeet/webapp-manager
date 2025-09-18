@@ -1,9 +1,9 @@
 """
 WebApp Manager - Sistema completo de gestión de aplicaciones web
-Versión 3.0 - Arquitectura modular y escalable
+Versión 4.0 - Arquitectura modular y escalable para Linux
 """
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 __description__ = "Sistema completo de gestión de aplicaciones web con nginx proxy reverso"
 __author__ = "WebApp Manager Team"
 

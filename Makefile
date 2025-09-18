@@ -50,6 +50,7 @@ help:
 	@echo "  $(GREEN)create-alias$(NC)      - Create local alias"
 	@echo "  $(GREEN)uninstall-global$(NC)  - Remove global installation"
 	@echo "  $(GREEN)debug-install$(NC)     - Debug installation issues"
+	@echo "  $(GREEN)test-install$(NC)      - Test installation works"
 	@echo ""
 
 # Create virtual environment
@@ -271,6 +272,12 @@ create-alias:
 .PHONY: install-global
 install-global: check-root
 	@echo "$(BLUE)Installing webapp-manager globally...$(NC)"
+	@if [ ! -f webapp-manager.py ]; then \
+		echo "$(RED)Error: webapp-manager.py not found$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)Validating Python syntax...$(NC)"
+	@python3 -m py_compile webapp-manager.py || (echo "$(RED)Error: Invalid Python syntax$(NC)" && exit 1)
 	@echo "$(BLUE)Creating installation directory...$(NC)"
 	sudo mkdir -p /opt/webapp-manager
 	sudo cp -r webapp_manager/ /opt/webapp-manager/
@@ -278,16 +285,21 @@ install-global: check-root
 	sudo cp setup.py /opt/webapp-manager/ 2>/dev/null || true
 	sudo cp requirements.txt /opt/webapp-manager/ 2>/dev/null || true
 	@echo "$(BLUE)Creating global executable...$(NC)"
-	@echo '#!/bin/bash' | sudo tee /usr/local/bin/webapp-manager > /dev/null
-	@echo 'cd /opt/webapp-manager && python3 webapp-manager.py "$$@"' | sudo tee -a /usr/local/bin/webapp-manager > /dev/null
+	sudo rm -f /usr/local/bin/webapp-manager
+	@echo '#!/bin/bash' > /tmp/webapp-manager-wrapper
+	@echo 'cd /opt/webapp-manager' >> /tmp/webapp-manager-wrapper
+	@echo 'exec python3 webapp-manager.py "$$@"' >> /tmp/webapp-manager-wrapper
+	sudo cp /tmp/webapp-manager-wrapper /usr/local/bin/webapp-manager
 	sudo chmod +x /usr/local/bin/webapp-manager
+	rm -f /tmp/webapp-manager-wrapper
 	@echo "$(GREEN)webapp-manager installed globally!$(NC)"
 
 # Remove global installation
 .PHONY: uninstall-global
 uninstall-global: check-root
 	@echo "$(BLUE)Removing global installation...$(NC)"
-	rm -f /usr/local/bin/webapp-manager
+	sudo rm -f /usr/local/bin/webapp-manager
+	sudo rm -rf /opt/webapp-manager
 	@echo "$(GREEN)Global installation removed!$(NC)"
 
 # Debug installation
@@ -299,6 +311,7 @@ debug-install:
 		echo "$(GREEN)Found: /usr/local/bin/webapp-manager$(NC)"; \
 		echo "$(BLUE)Content:$(NC)"; \
 		cat /usr/local/bin/webapp-manager; \
+		echo ""; \
 		echo "$(BLUE)Permissions:$(NC)"; \
 		ls -la /usr/local/bin/webapp-manager; \
 	else \
@@ -308,11 +321,60 @@ debug-install:
 	@if [ -d /opt/webapp-manager ]; then \
 		echo "$(GREEN)Found: /opt/webapp-manager$(NC)"; \
 		ls -la /opt/webapp-manager/; \
+		echo "$(BLUE)Python file content (first 5 lines):$(NC)"; \
+		head -5 /opt/webapp-manager/webapp-manager.py 2>/dev/null || echo "$(RED)Cannot read Python file$(NC)"; \
 	else \
 		echo "$(RED)Not found: /opt/webapp-manager$(NC)"; \
 	fi
 	@echo "$(YELLOW)Testing direct Python execution...$(NC)"
-	python3 webapp-manager.py --help || echo "$(RED)Direct execution failed$(NC)"
+	python3 webapp-manager.py --help 2>/dev/null || echo "$(RED)Direct execution failed$(NC)"
+	@echo "$(YELLOW)Testing Python syntax...$(NC)"
+	python3 -m py_compile webapp-manager.py 2>/dev/null && echo "$(GREEN)Python syntax OK$(NC)" || echo "$(RED)Python syntax ERROR$(NC)"
+	@echo "$(YELLOW)PATH check...$(NC)"
+	which webapp-manager || echo "$(RED)webapp-manager not in PATH$(NC)"
+	@echo "$(YELLOW)Testing version command...$(NC)"
+	webapp-manager version 2>/dev/null || echo "$(RED)Version command failed$(NC)"
+
+# Test installation thoroughly
+.PHONY: test-install
+test-install:
+	@echo "$(BLUE)Testing webapp-manager installation...$(NC)"
+	@echo "$(YELLOW)Step 1: Check if installed...$(NC)"
+	@if [ -f /usr/local/bin/webapp-manager ] && [ -d /opt/webapp-manager ]; then \
+		echo "$(GREEN)✓ Installation files found$(NC)"; \
+	else \
+		echo "$(RED)✗ Installation files missing$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Step 2: Check executable permissions...$(NC)"
+	@if [ -x /usr/local/bin/webapp-manager ]; then \
+		echo "$(GREEN)✓ Executable permissions OK$(NC)"; \
+	else \
+		echo "$(RED)✗ Executable permissions missing$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Step 3: Check Python file syntax...$(NC)"
+	@if python3 -c "import py_compile; py_compile.compile('/opt/webapp-manager/webapp-manager.py')" 2>/dev/null; then \
+		echo "$(GREEN)✓ Python syntax valid$(NC)"; \
+	else \
+		echo "$(RED)✗ Python syntax invalid$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Step 4: Test command availability...$(NC)"
+	@if command -v webapp-manager >/dev/null 2>&1; then \
+		echo "$(GREEN)✓ Command available in PATH$(NC)"; \
+	else \
+		echo "$(RED)✗ Command not in PATH$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Step 5: Test version command...$(NC)"
+	@if timeout 10 webapp-manager version >/dev/null 2>&1; then \
+		echo "$(GREEN)✓ Version command works$(NC)"; \
+	else \
+		echo "$(RED)✗ Version command failed$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)🎉 Installation test passed!$(NC)"
 
 # Development workflow
 .PHONY: dev

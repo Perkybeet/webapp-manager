@@ -239,7 +239,8 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             choices=[
                 "add", "remove", "list", "restart", "update", 
                 "logs", "ssl", "diagnose", "repair", "status",
-                "export", "import", "types", "detect", "fix-config"
+                "export", "import", "types", "detect", "fix-config",
+                "version", "gui"
             ],
             help="Comando a ejecutar"
         )
@@ -360,7 +361,9 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "import": "Importar Configuración",
                 "types": "Tipos de Aplicación",
                 "detect": "Detectar Tipo",
-                "fix-config": "Reparar Configuración"
+                "fix-config": "Reparar Configuración",
+                "version": "Información de Versión",
+                "gui": "Interfaz Gráfica"
             }
             
             self.console.print(Panel(
@@ -400,6 +403,12 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             return True
         elif command == "fix-config":
             return self._cmd_fix_config(args)
+        elif command == "version":
+            self._cmd_version()
+            return True
+        elif command == "gui":
+            self._cmd_gui()
+            return True
         else:
             self._show_error(f"Comando no implementado: {command}")
             return False
@@ -1002,6 +1011,29 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         """Comando fix-config"""
         self._show_info("Función fix-config no implementada todavía")
         return True
+    
+    def _cmd_version(self):
+        """Mostrar información de versión"""
+        from .. import __version__, __description__
+        
+        version_info = Table(show_header=False, box=None)
+        version_info.add_row("🚀", f"[bold cyan]WebApp Manager[/bold cyan]")
+        version_info.add_row("📦", f"Versión: [bold green]{__version__}[/bold green]")
+        version_info.add_row("📝", f"Descripción: {__description__}")
+        version_info.add_row("🐍", f"Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        version_info.add_row("🐧", f"Sistema: {'Linux' if os.name == 'posix' else 'Windows'}")
+        
+        self.console.print(Panel(
+            Align.center(version_info),
+            title="[bold]Información del Sistema[/bold]",
+            style="blue"
+        ))
+    
+    def _cmd_gui(self):
+        """Abrir interfaz gráfica (dialog)"""
+        self._show_info("Abriendo interfaz gráfica con Dialog...")
+        # Aquí iría la implementación de la GUI con dialog
+        self._show_warning("Función GUI no implementada todavía")
 
 
 def main():
