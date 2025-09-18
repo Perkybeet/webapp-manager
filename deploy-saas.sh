@@ -120,6 +120,11 @@ show_help() {
     echo "  $0"
     echo "  $0 --unattended --domain panel.example.com --enable-ssl"
     echo "  $0 --port 9000 --user myuser"
+    echo ""
+    echo "Notes:"
+    echo "• The script automatically detects nginx conflicts and configures specific server_name"
+    echo "• When no domain is specified, the script uses the server's public IP as server_name"
+    echo "• This prevents conflicts with existing nginx sites and ensures proper proxy routing"
 }
 
 # Check if running as root or has sudo privileges
@@ -1019,6 +1024,48 @@ install_missing_packages() {
     fi
 }
 
+# Check and resolve nginx conflicts
+check_nginx_conflicts() {
+    log_step "Checking for nginx configuration conflicts..."
+    
+    # Check if default site is enabled and might conflict
+    if [[ -L "/etc/nginx/sites-enabled/default" ]]; then
+        log_warning "Default nginx site found, this may conflict with webapp-manager-saas"
+        if [[ "$UNATTENDED" != "true" ]]; then
+            read -p "Do you want to disable the default nginx site? (y/n): " -n 1 -r
+            echo
+        else
+            REPLY="y"
+        fi
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            $CMD_PREFIX rm -f "/etc/nginx/sites-enabled/default"
+            log_success "Default nginx site disabled"
+        fi
+    fi
+    
+    # Check for other sites that might conflict with catch-all server_name
+    local conflicting_sites=()
+    if [[ -d "/etc/nginx/sites-enabled" ]]; then
+        while IFS= read -r -d '' site; do
+            site_name=$(basename "$site")
+            if [[ "$site_name" != "webapp-manager-saas" ]]; then
+                # Check if site has catch-all server_name or HTTP redirect
+                if grep -q "server_name.*_.*;" "$site" 2>/dev/null || 
+                   grep -q "listen.*80.*;" "$site" 2>/dev/null; then
+                    conflicting_sites+=("$site_name")
+                fi
+            fi
+        done < <(find "/etc/nginx/sites-enabled" -type l -print0 2>/dev/null)
+    fi
+    
+    if [[ ${#conflicting_sites[@]} -gt 0 ]]; then
+        log_warning "Found potentially conflicting nginx sites: ${conflicting_sites[*]}"
+        log_info "These sites may interfere with webapp-manager-saas access by IP"
+        log_info "The script will configure webapp-manager-saas with specific server_name to avoid conflicts"
+    fi
+}
+
 # Configure nginx
 configure_nginx() {
     log_step "Configuring nginx reverse proxy..."
@@ -1033,7 +1080,15 @@ configure_nginx() {
     if [[ -n "$DOMAIN" ]]; then
         server_name="$DOMAIN"
     else
-        server_name="_"
+        # Get server IP address for specific server_name to avoid conflicts with other nginx configs
+        SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || curl -s ipecho.net/plain 2>/dev/null || echo "")
+        if [[ -n "$SERVER_IP" ]]; then
+            log_info "Detected server IP: $SERVER_IP"
+            server_name="$SERVER_IP"
+        else
+            log_warning "Could not detect server IP, using catch-all server name"
+            server_name="_"
+        fi
     fi
     
     $CMD_PREFIX tee "$nginx_conf_file" > /dev/null << EOF
@@ -1347,8 +1402,18 @@ show_completion() {
         fi
         echo "• HTTP: http://$DOMAIN"
     else
+        # Get server IP for access instructions
+        SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || curl -s ipecho.net/plain 2>/dev/null || echo "")
         echo "• Direct: http://localhost:$WEB_PORT"
-        echo "• Network: http://$(hostname -I | awk '{print $1}'):$WEB_PORT"
+        if [[ -n "$SERVER_IP" ]]; then
+            echo "• Network: http://$SERVER_IP"
+            echo "• ⚠️  Note: nginx proxy configured for IP access at http://$SERVER_IP"
+        else
+            LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "")
+            if [[ -n "$LOCAL_IP" ]]; then
+                echo "• Network: http://$LOCAL_IP:$WEB_PORT"
+            fi
+        fi
     fi
     
     echo ""
@@ -1398,6 +1463,7 @@ main() {
     create_startup_script
     create_configuration
     create_systemd_service
+    check_nginx_conflicts
     configure_nginx
     configure_ssl
     configure_firewall
@@ -1410,3 +1476,10 @@ main() {
 
 # Run installation
 main "$@"
+
+# Post-installation notes:
+# - If you experience nginx conflicts after deployment, run:
+#   sudo nginx -t && sudo systemctl reload nginx
+# - To manually fix IP-based access conflicts:
+#   sudo sed -i 's/server_name _;/server_name YOUR_SERVER_IP;/' /etc/nginx/sites-available/webapp-manager-saas
+#   sudo systemctl reload nginx
