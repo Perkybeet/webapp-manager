@@ -683,6 +683,13 @@ except ImportError as e:
     exit(1)
 
 try:
+    from starlette.middleware.sessions import SessionMiddleware
+    print('✅ starlette.middleware.sessions imported successfully')
+except ImportError as e:
+    print(f'❌ starlette.middleware.sessions import failed: {e}')
+    exit(1)
+
+try:
     import uvicorn
     print('✅ uvicorn imported successfully')
 except ImportError as e:
