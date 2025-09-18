@@ -1,0 +1,25 @@
+# Web Application Dependencies for WebApp Manager SAAS
+
+# FastAPI and related
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+jinja2>=3.1.2
+python-multipart>=0.0.6
+
+# Authentication and security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+itsdangerous>=2.1.2
+
+# Database
+sqlite3  # Built into Python
+
+# HTTP client for internal API calls
+httpx>=0.25.0
+
+# Additional utilities
+pydantic>=2.4.2
+python-dotenv>=1.0.0
+
+# Optional: for production deployment
+gunicorn>=21.2.0

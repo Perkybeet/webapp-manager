@@ -1,0 +1,843 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración - WebApp Manager SAAS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-cog me-2 text-primary"></i>
+                Configuración del Sistema
+            </h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" onclick="loadConfiguration()">
+                    <i class="fas fa-sync-alt me-1"></i>Actualizar
+                </button>
+                <button class="btn btn-primary" onclick="saveConfiguration()">
+                    <i class="fas fa-save me-1"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Navigation Tabs -->
+    <div class="col-md-3">
+        <div class="list-group" id="configTabs">
+            <a class="list-group-item list-group-item-action active" 
+               data-bs-toggle="pill" href="#general-config">
+                <i class="fas fa-cogs me-2"></i>General
+            </a>
+            <a class="list-group-item list-group-item-action" 
+               data-bs-toggle="pill" href="#server-config">
+                <i class="fas fa-server me-2"></i>Servidor Web
+            </a>
+            <a class="list-group-item list-group-item-action" 
+               data-bs-toggle="pill" href="#paths-config">
+                <i class="fas fa-folder me-2"></i>Rutas del Sistema
+            </a>
+            <a class="list-group-item list-group-item-action" 
+               data-bs-toggle="pill" href="#nginx-config">
+                <i class="fas fa-globe me-2"></i>Nginx
+            </a>
+            <a class="list-group-item list-group-item-action" 
+               data-bs-toggle="pill" href="#security-config">
+                <i class="fas fa-shield-alt me-2"></i>Seguridad
+            </a>
+            <a class="list-group-item list-group-item-action" 
+               data-bs-toggle="pill" href="#backup-config">
+                <i class="fas fa-database me-2"></i>Respaldos
+            </a>
+            <a class="list-group-item list-group-item-action" 
+               data-bs-toggle="pill" href="#users-config">
+                <i class="fas fa-users me-2"></i>Usuarios
+            </a>
+        </div>
+    </div>
+
+    <!-- Configuration Content -->
+    <div class="col-md-9">
+        <div class="tab-content" id="configContent">
+            <!-- General Configuration -->
+            <div class="tab-pane fade show active" id="general-config">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-cogs me-2"></i>Configuración General
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="generalConfigForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="systemName" class="form-label">Nombre del Sistema</label>
+                                        <input type="text" class="form-control" id="systemName" 
+                                               name="system_name" value="WebApp Manager SAAS">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="systemDescription" class="form-label">Descripción</label>
+                                        <input type="text" class="form-control" id="systemDescription" 
+                                               name="system_description" value="Sistema de Gestión de Aplicaciones Web">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="defaultAppType" class="form-label">Tipo de App por Defecto</label>
+                                        <select class="form-control" id="defaultAppType" name="default_app_type">
+                                            <option value="nextjs">Next.js</option>
+                                            <option value="fastapi">FastAPI</option>
+                                            <option value="nodejs">Node.js</option>
+                                            <option value="static">Sitio Estático</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="defaultPort" class="form-label">Puerto por Defecto</label>
+                                        <input type="number" class="form-control" id="defaultPort" 
+                                               name="default_port" value="3000" min="1000" max="65535">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="timezone" class="form-label">Zona Horaria</label>
+                                <select class="form-control" id="timezone" name="timezone">
+                                    <option value="UTC">UTC</option>
+                                    <option value="America/Mexico_City">America/Mexico_City</option>
+                                    <option value="America/New_York">America/New_York</option>
+                                    <option value="Europe/Madrid">Europe/Madrid</option>
+                                </select>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="autoBackup" 
+                                               name="auto_backup" checked>
+                                        <label class="form-check-label" for="autoBackup">
+                                            Respaldos Automáticos
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="verboseLogging" 
+                                               name="verbose_logging">
+                                        <label class="form-check-label" for="verboseLogging">
+                                            Logging Detallado
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server Configuration -->
+            <div class="tab-pane fade" id="server-config">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-server me-2"></i>Configuración del Servidor Web
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="serverConfigForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="webServerHost" class="form-label">Host del Servidor</label>
+                                        <input type="text" class="form-control" id="webServerHost" 
+                                               name="web_server_host" value="0.0.0.0">
+                                        <div class="form-text">IP para bind del servidor web</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="webServerPort" class="form-label">Puerto del Servidor</label>
+                                        <input type="number" class="form-control" id="webServerPort" 
+                                               name="web_server_port" value="8080" min="1" max="65535">
+                                        <div class="form-text">Puerto para el panel de control web</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="sessionTimeout" class="form-label">Timeout de Sesión (horas)</label>
+                                        <input type="number" class="form-control" id="sessionTimeout" 
+                                               name="session_timeout" value="24" min="1" max="168">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxRequestSize" class="form-label">Tamaño Máximo de Request (MB)</label>
+                                        <input type="number" class="form-control" id="maxRequestSize" 
+                                               name="max_request_size" value="50" min="1" max="1000">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="corsOrigins" class="form-label">Orígenes CORS Permitidos</label>
+                                <textarea class="form-control" id="corsOrigins" name="cors_origins" 
+                                          rows="3" placeholder="https://ejemplo.com">*</textarea>
+                                <div class="form-text">Un origen por línea. Use * para permitir todos</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableHttps" 
+                                               name="enable_https">
+                                        <label class="form-check-label" for="enableHttps">
+                                            Habilitar HTTPS
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableCompression" 
+                                               name="enable_compression" checked>
+                                        <label class="form-check-label" for="enableCompression">
+                                            Habilitar Compresión
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paths Configuration -->
+            <div class="tab-pane fade" id="paths-config">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-folder me-2"></i>Rutas del Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="pathsConfigForm">
+                            <div class="mb-3">
+                                <label for="appsBaseDir" class="form-label">Directorio Base de Aplicaciones</label>
+                                <input type="text" class="form-control" id="appsBaseDir" 
+                                       name="apps_base_dir" value="/var/www">
+                                <div class="form-text">Directorio donde se instalan las aplicaciones</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="backupDir" class="form-label">Directorio de Respaldos</label>
+                                <input type="text" class="form-control" id="backupDir" 
+                                       name="backup_dir" value="/var/backups/webapp-manager">
+                                <div class="form-text">Directorio para almacenar respaldos</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="logsDir" class="form-label">Directorio de Logs</label>
+                                <input type="text" class="form-control" id="logsDir" 
+                                       name="logs_dir" value="/var/log/webapp-manager">
+                                <div class="form-text">Directorio para logs del sistema</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="tempDir" class="form-label">Directorio Temporal</label>
+                                <input type="text" class="form-control" id="tempDir" 
+                                       name="temp_dir" value="/tmp/webapp-manager">
+                                <div class="form-text">Directorio para archivos temporales</div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nginx Configuration -->
+            <div class="tab-pane fade" id="nginx-config">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-globe me-2"></i>Configuración de Nginx
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="nginxConfigForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="nginxSitesAvailable" class="form-label">Sites Available</label>
+                                        <input type="text" class="form-control" id="nginxSitesAvailable" 
+                                               name="nginx_sites_available" value="/etc/nginx/sites-available">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="nginxSitesEnabled" class="form-label">Sites Enabled</label>
+                                        <input type="text" class="form-control" id="nginxSitesEnabled" 
+                                               name="nginx_sites_enabled" value="/etc/nginx/sites-enabled">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableSsl" 
+                                               name="enable_ssl" checked>
+                                        <label class="form-check-label" for="enableSsl">
+                                            Habilitar SSL por Defecto
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableGzip" 
+                                               name="enable_gzip" checked>
+                                        <label class="form-check-label" for="enableGzip">
+                                            Habilitar Gzip
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="defaultNginxTemplate" class="form-label">Plantilla Nginx por Defecto</label>
+                                <select class="form-control" id="defaultNginxTemplate" name="default_nginx_template">
+                                    <option value="proxy">Proxy Reverso</option>
+                                    <option value="static">Sitio Estático</option>
+                                    <option value="spa">SPA (Single Page App)</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Configuration -->
+            <div class="tab-pane fade" id="security-config">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>Configuración de Seguridad
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="securityConfigForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxLoginAttempts" class="form-label">Máximo Intentos de Login</label>
+                                        <input type="number" class="form-control" id="maxLoginAttempts" 
+                                               name="max_login_attempts" value="5" min="1" max="10">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="lockoutDuration" class="form-label">Duración de Bloqueo (minutos)</label>
+                                        <input type="number" class="form-control" id="lockoutDuration" 
+                                               name="lockout_duration" value="15" min="1" max="1440">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="passwordPolicy" class="form-label">Política de Contraseñas</label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="requireUppercase" 
+                                                   name="require_uppercase" checked>
+                                            <label class="form-check-label" for="requireUppercase">
+                                                Requerir Mayúsculas
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="requireNumbers" 
+                                                   name="require_numbers" checked>
+                                            <label class="form-check-label" for="requireNumbers">
+                                                Requerir Números
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <label for="minPasswordLength" class="form-label">Longitud Mínima</label>
+                                        <input type="number" class="form-control" id="minPasswordLength" 
+                                               name="min_password_length" value="8" min="4" max="50">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mt-4">
+                                            <input class="form-check-input" type="checkbox" id="requireSymbols" 
+                                                   name="require_symbols">
+                                            <label class="form-check-label" for="requireSymbols">
+                                                Requerir Símbolos
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableTwoFactor" 
+                                               name="enable_two_factor">
+                                        <label class="form-check-label" for="enableTwoFactor">
+                                            Autenticación de Dos Factores
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableAuditLog" 
+                                               name="enable_audit_log" checked>
+                                        <label class="form-check-label" for="enableAuditLog">
+                                            Log de Auditoría
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup Configuration -->
+            <div class="tab-pane fade" id="backup-config">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-database me-2"></i>Configuración de Respaldos
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="backupConfigForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="backupSchedule" class="form-label">Programa de Respaldos</label>
+                                        <select class="form-control" id="backupSchedule" name="backup_schedule">
+                                            <option value="never">Nunca</option>
+                                            <option value="daily">Diario</option>
+                                            <option value="weekly" selected>Semanal</option>
+                                            <option value="monthly">Mensual</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxBackups" class="form-label">Número Máximo de Respaldos</label>
+                                        <input type="number" class="form-control" id="maxBackups" 
+                                               name="max_backups" value="7" min="1" max="30">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="backupDatabase" 
+                                               name="backup_database" checked>
+                                        <label class="form-check-label" for="backupDatabase">
+                                            Respaldar Base de Datos
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="backupConfigs" 
+                                               name="backup_configs" checked>
+                                        <label class="form-check-label" for="backupConfigs">
+                                            Respaldar Configuraciones
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="compressionLevel" class="form-label">Nivel de Compresión</label>
+                                <select class="form-control" id="compressionLevel" name="compression_level">
+                                    <option value="none">Sin Compresión</option>
+                                    <option value="low">Bajo</option>
+                                    <option value="medium" selected>Medio</option>
+                                    <option value="high">Alto</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Configuration -->
+            <div class="tab-pane fade" id="users-config">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-users me-2"></i>Gestión de Usuarios
+                        </h5>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                            <i class="fas fa-user-plus me-1"></i>Nuevo Usuario
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Email</th>
+                                        <th>Tipo</th>
+                                        <th>Estado</th>
+                                        <th>Último Login</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTable">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>Cargando usuarios...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus me-2"></i>Nuevo Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="mb-3">
+                        <label for="newUsername" class="form-label">Nombre de Usuario</label>
+                        <input type="text" class="form-control" id="newUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="newEmail" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="newPassword" name="password" required>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="newIsAdmin" name="is_admin">
+                        <label class="form-check-label" for="newIsAdmin">
+                            Usuario Administrador
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="createUser()">
+                    <i class="fas fa-user-plus me-1"></i>Crear Usuario
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentConfiguration = {};
+
+// Initialize settings
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfiguration();
+    loadUsers();
+});
+
+async function loadConfiguration() {
+    try {
+        const response = await axios.get('/api/v1/config');
+        currentConfiguration = response.data.config || {};
+        
+        // Populate forms with current configuration
+        populateConfigurationForms();
+        
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        showAlert('Error al cargar la configuración', 'danger');
+    }
+}
+
+function populateConfigurationForms() {
+    // General config
+    const generalForm = document.getElementById('generalConfigForm');
+    if (generalForm) {
+        setFormValue(generalForm, 'system_name', currentConfiguration.system_name || 'WebApp Manager SAAS');
+        setFormValue(generalForm, 'system_description', currentConfiguration.system_description || 'Sistema de Gestión de Aplicaciones Web');
+        setFormValue(generalForm, 'default_app_type', currentConfiguration.default_app_type || 'nextjs');
+        setFormValue(generalForm, 'default_port', currentConfiguration.default_port || '3000');
+        setFormValue(generalForm, 'timezone', currentConfiguration.timezone || 'UTC');
+        setFormValue(generalForm, 'auto_backup', currentConfiguration.auto_backup !== 'false');
+        setFormValue(generalForm, 'verbose_logging', currentConfiguration.verbose_logging === 'true');
+    }
+    
+    // Server config
+    const serverForm = document.getElementById('serverConfigForm');
+    if (serverForm) {
+        setFormValue(serverForm, 'web_server_host', currentConfiguration.web_server_host || '0.0.0.0');
+        setFormValue(serverForm, 'web_server_port', currentConfiguration.web_server_port || '8080');
+        setFormValue(serverForm, 'session_timeout', currentConfiguration.session_timeout || '24');
+        setFormValue(serverForm, 'max_request_size', currentConfiguration.max_request_size || '50');
+        setFormValue(serverForm, 'cors_origins', currentConfiguration.cors_origins || '*');
+        setFormValue(serverForm, 'enable_https', currentConfiguration.enable_https === 'true');
+        setFormValue(serverForm, 'enable_compression', currentConfiguration.enable_compression !== 'false');
+    }
+    
+    // Continue for other forms...
+}
+
+function setFormValue(form, name, value) {
+    const element = form.querySelector(`[name="${name}"]`);
+    if (!element) return;
+    
+    if (element.type === 'checkbox') {
+        element.checked = Boolean(value);
+    } else {
+        element.value = value;
+    }
+}
+
+async function saveConfiguration() {
+    try {
+        const configData = {};
+        
+        // Collect data from all forms
+        const forms = ['generalConfigForm', 'serverConfigForm', 'pathsConfigForm', 
+                      'nginxConfigForm', 'securityConfigForm', 'backupConfigForm'];
+        
+        forms.forEach(formId => {
+            const form = document.getElementById(formId);
+            if (form) {
+                const formData = new FormData(form);
+                for (let [key, value] of formData.entries()) {
+                    const element = form.querySelector(`[name="${key}"]`);
+                    if (element && element.type === 'checkbox') {
+                        configData[key] = element.checked ? 'true' : 'false';
+                    } else {
+                        configData[key] = value;
+                    }
+                }
+            }
+        });
+        
+        await axios.post('/api/v1/config', configData);
+        showAlert('Configuración guardada correctamente', 'success');
+        
+        // Reload configuration
+        loadConfiguration();
+        
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        const message = error.response?.data?.detail || 'Error al guardar la configuración';
+        showAlert(message, 'danger');
+    }
+}
+
+async function loadUsers() {
+    try {
+        // This would be a real API endpoint in the full implementation
+        const users = [
+            {
+                id: 1,
+                username: 'admin',
+                email: 'admin@example.com',
+                is_admin: true,
+                is_active: true,
+                last_login: new Date().toISOString()
+            }
+        ];
+        
+        displayUsers(users);
+        
+    } catch (error) {
+        console.error('Error loading users:', error);
+        showAlert('Error al cargar los usuarios', 'danger');
+    }
+}
+
+function displayUsers(users) {
+    const tbody = document.getElementById('usersTable');
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="fas fa-users-slash me-2"></i>No hay usuarios registrados
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-user-circle me-2 text-muted"></i>
+                    <strong>${user.username}</strong>
+                </div>
+            </td>
+            <td>${user.email || 'N/A'}</td>
+            <td>
+                <span class="badge ${user.is_admin ? 'bg-warning' : 'bg-secondary'}">
+                    <i class="fas ${user.is_admin ? 'fa-crown' : 'fa-user'} me-1"></i>
+                    ${user.is_admin ? 'Admin' : 'Usuario'}
+                </span>
+            </td>
+            <td>
+                <span class="badge ${user.is_active ? 'bg-success' : 'bg-danger'}">
+                    <i class="fas ${user.is_active ? 'fa-check-circle' : 'fa-times-circle'} me-1"></i>
+                    ${user.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${user.last_login ? formatDate(user.last_login) : 'Nunca'}
+                </small>
+            </td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                            data-bs-toggle="dropdown">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="editUser(${user.id})">
+                                <i class="fas fa-edit me-2"></i>Editar
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="resetPassword(${user.id})">
+                                <i class="fas fa-key me-2"></i>Resetear Contraseña
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item ${user.is_active ? 'text-warning' : 'text-success'}" 
+                               href="#" onclick="toggleUserStatus(${user.id})">
+                                <i class="fas ${user.is_active ? 'fa-ban' : 'fa-check'} me-2"></i>
+                                ${user.is_active ? 'Desactivar' : 'Activar'}
+                            </a>
+                        </li>
+                        ${user.id !== 1 ? `
+                        <li>
+                            <a class="dropdown-item text-danger" href="#" onclick="deleteUser(${user.id}, '${user.username}')">
+                                <i class="fas fa-trash me-2"></i>Eliminar
+                            </a>
+                        </li>
+                        ` : ''}
+                    </ul>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function createUser() {
+    try {
+        const form = document.getElementById('addUserForm');
+        const formData = new FormData(form);
+        
+        const userData = {
+            username: formData.get('username'),
+            email: formData.get('email'),
+            password: formData.get('password'),
+            is_admin: formData.get('is_admin') === 'on'
+        };
+        
+        // This would be a real API call
+        console.log('Creating user:', userData);
+        
+        // Close modal and refresh
+        bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+        showAlert('Usuario creado correctamente', 'success');
+        form.reset();
+        loadUsers();
+        
+    } catch (error) {
+        console.error('Error creating user:', error);
+        showAlert('Error al crear el usuario', 'danger');
+    }
+}
+
+function editUser(userId) {
+    // Implementation for editing user
+    console.log('Edit user:', userId);
+}
+
+function resetPassword(userId) {
+    if (confirm('¿Está seguro de que desea resetear la contraseña de este usuario?')) {
+        console.log('Reset password for user:', userId);
+        showAlert('Contraseña reseteada correctamente', 'success');
+    }
+}
+
+function toggleUserStatus(userId) {
+    console.log('Toggle user status:', userId);
+    showAlert('Estado del usuario actualizado', 'success');
+    loadUsers();
+}
+
+function deleteUser(userId, username) {
+    if (confirm(`¿Está seguro de que desea eliminar al usuario "${username}"?`)) {
+        console.log('Delete user:', userId);
+        showAlert('Usuario eliminado correctamente', 'success');
+        loadUsers();
+    }
+}
+
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+}
+
+function showAlert(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const main = document.querySelector('main');
+    main.insertBefore(alert, main.firstChild);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

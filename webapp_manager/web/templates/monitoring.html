@@ -1,0 +1,607 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoreo del Sistema - WebApp Manager SAAS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-chart-line me-2 text-primary"></i>
+                Monitoreo del Sistema
+            </h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" onclick="refreshMonitoring()">
+                    <i class="fas fa-sync-alt me-1"></i>Actualizar
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-clock me-1"></i>Período
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="changeTimeRange(1)">Última hora</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="changeTimeRange(24)">Últimas 24h</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="changeTimeRange(168)">Última semana</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="changeTimeRange(720)">Último mes</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Overview -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-primary rounded-circle p-3">
+                        <i class="fas fa-microchip text-white fa-2x"></i>
+                    </div>
+                </div>
+                <h4 class="card-title" id="currentCpu">--%</h4>
+                <p class="card-text text-muted">CPU Actual</p>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-primary" id="cpuProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-success rounded-circle p-3">
+                        <i class="fas fa-memory text-white fa-2x"></i>
+                    </div>
+                </div>
+                <h4 class="card-title" id="currentMemory">--%</h4>
+                <p class="card-text text-muted">Memoria Actual</p>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" id="memoryProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-warning rounded-circle p-3">
+                        <i class="fas fa-hdd text-white fa-2x"></i>
+                    </div>
+                </div>
+                <h4 class="card-title" id="currentDisk">--%</h4>
+                <p class="card-text text-muted">Disco Actual</p>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-warning" id="diskProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-info rounded-circle p-3">
+                        <i class="fas fa-network-wired text-white fa-2x"></i>
+                    </div>
+                </div>
+                <h4 class="card-title" id="currentNetwork">-- MB/s</h4>
+                <p class="card-text text-muted">Red Actual</p>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-info" id="networkProgressBar" style="width: 50%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Usage Charts -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-area me-2"></i>Uso de Recursos en el Tiempo
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="usageChart" style="height: 400px;">
+                    <div class="d-flex justify-content-center align-items-center h-100">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Cargando gráfico de uso...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-server me-2"></i>Estado de Aplicaciones
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="appStatusChart" style="height: 400px;">
+                    <div class="d-flex justify-content-center align-items-center h-100">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Cargando estado de apps...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Application Performance -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tachometer-alt me-2"></i>Rendimiento por Aplicación
+                </h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary active" onclick="showMetric('cpu')">CPU</button>
+                    <button class="btn btn-outline-primary" onclick="showMetric('memory')">Memoria</button>
+                    <button class="btn btn-outline-primary" onclick="showMetric('disk')">Disco</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Aplicación</th>
+                                <th>Estado</th>
+                                <th>CPU</th>
+                                <th>Memoria</th>
+                                <th>Disco</th>
+                                <th>Red (In/Out)</th>
+                                <th>Uptime</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appPerformanceTable">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando datos de rendimiento...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Logs -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt me-2"></i>Logs del Sistema
+                </h5>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="logLevelFilter" onchange="filterLogs()">
+                        <option value="">Todos los niveles</option>
+                        <option value="ERROR">Error</option>
+                        <option value="WARNING">Warning</option>
+                        <option value="INFO">Info</option>
+                    </select>
+                    <button class="btn btn-outline-danger btn-sm" onclick="clearLogs()">
+                        <i class="fas fa-trash me-1"></i>Limpiar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="systemLogs" style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.9rem;">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Cargando logs del sistema...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Alerts -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="alertsContainer"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentTimeRange = 24; // hours
+let refreshInterval;
+let usageChart = null;
+let statusChart = null;
+
+// Initialize monitoring
+document.addEventListener('DOMContentLoaded', function() {
+    loadMonitoringData();
+    startRealTimeMonitoring();
+});
+
+async function loadMonitoringData() {
+    try {
+        await Promise.all([
+            loadSystemStats(),
+            loadApplicationPerformance(),
+            loadSystemLogs(),
+            loadUsageChart(),
+            loadStatusChart()
+        ]);
+    } catch (error) {
+        console.error('Error loading monitoring data:', error);
+        showAlert('Error al cargar los datos de monitoreo', 'danger');
+    }
+}
+
+async function loadSystemStats() {
+    try {
+        const response = await axios.get('/api/v1/system/stats');
+        const stats = response.data;
+        
+        // Update current usage displays
+        const cpu = Math.round(stats.system_usage.cpu_usage);
+        const memory = Math.round(stats.system_usage.memory_usage);
+        const disk = Math.round(stats.system_usage.disk_usage);
+        
+        document.getElementById('currentCpu').textContent = cpu + '%';
+        document.getElementById('currentMemory').textContent = memory + '%';
+        document.getElementById('currentDisk').textContent = disk + '%';
+        document.getElementById('currentNetwork').textContent = '-- MB/s'; // Placeholder
+        
+        // Update progress bars
+        updateProgressBar('cpuProgressBar', cpu);
+        updateProgressBar('memoryProgressBar', memory);
+        updateProgressBar('diskProgressBar', disk);
+        
+    } catch (error) {
+        console.error('Error loading system stats:', error);
+    }
+}
+
+async function loadApplicationPerformance() {
+    try {
+        const appsResponse = await axios.get('/api/v1/applications');
+        const apps = appsResponse.data;
+        
+        const tbody = document.getElementById('appPerformanceTable');
+        
+        if (apps.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        <i class="fas fa-inbox me-2"></i>No hay aplicaciones para mostrar
+                    </td>
+                </tr>`;
+            return;
+        }
+        
+        // Get performance data for each app (simulated for now)
+        const performanceData = await Promise.all(
+            apps.map(async (app) => {
+                try {
+                    const usageResponse = await axios.get(`/api/v1/system/usage/${app.id}?hours=1`);
+                    const usage = usageResponse.data.usage_history;
+                    
+                    // Calculate averages
+                    const avgCpu = usage.length > 0 ? 
+                        Math.round(usage.reduce((a, u) => a + u.cpu_usage, 0) / usage.length) : 0;
+                    const avgMemory = usage.length > 0 ? 
+                        Math.round(usage.reduce((a, u) => a + u.memory_usage, 0) / usage.length) : 0;
+                    const avgDisk = usage.length > 0 ? 
+                        Math.round(usage.reduce((a, u) => a + u.disk_usage, 0) / usage.length) : 0;
+                    
+                    return {
+                        ...app,
+                        cpu: avgCpu,
+                        memory: avgMemory,
+                        disk: avgDisk,
+                        networkIn: 0, // Placeholder
+                        networkOut: 0, // Placeholder
+                        uptime: '-- m' // Placeholder
+                    };
+                } catch (error) {
+                    return {
+                        ...app,
+                        cpu: 0,
+                        memory: 0,
+                        disk: 0,
+                        networkIn: 0,
+                        networkOut: 0,
+                        uptime: '-- m'
+                    };
+                }
+            })
+        );
+        
+        tbody.innerHTML = performanceData.map(app => `
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-cube me-2 text-muted"></i>
+                        <strong>${app.name}</strong>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${getStatusBadgeClass(app.status)}">
+                        <i class="fas ${getStatusIcon(app.status)} me-1"></i>
+                        ${getStatusText(app.status)}
+                    </span>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="progress me-2" style="width: 50px; height: 8px;">
+                            <div class="progress-bar bg-primary" style="width: ${app.cpu}%"></div>
+                        </div>
+                        <small>${app.cpu}%</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="progress me-2" style="width: 50px; height: 8px;">
+                            <div class="progress-bar bg-success" style="width: ${app.memory}%"></div>
+                        </div>
+                        <small>${app.memory}%</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="progress me-2" style="width: 50px; height: 8px;">
+                            <div class="progress-bar bg-warning" style="width: ${app.disk}%"></div>
+                        </div>
+                        <small>${app.disk}%</small>
+                    </div>
+                </td>
+                <td>
+                    <small class="text-muted">
+                        <i class="fas fa-arrow-down text-success"></i> ${app.networkIn} MB/s<br>
+                        <i class="fas fa-arrow-up text-info"></i> ${app.networkOut} MB/s
+                    </small>
+                </td>
+                <td>
+                    <small class="text-muted">${app.uptime}</small>
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-info" onclick="viewAppDetails(${app.id})" title="Ver detalles">
+                            <i class="fas fa-chart-line"></i>
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="restartApp(${app.id})" title="Reiniciar">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Error loading application performance:', error);
+    }
+}
+
+async function loadSystemLogs() {
+    try {
+        const response = await axios.get('/api/v1/system/logs?limit=50');
+        const logs = response.data.logs;
+        
+        const logsContainer = document.getElementById('systemLogs');
+        
+        if (logs.length === 0) {
+            logsContainer.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox me-2"></i>No hay logs disponibles
+                </div>`;
+            return;
+        }
+        
+        logsContainer.innerHTML = logs.map(log => `
+            <div class="log-entry mb-2 p-2 rounded ${getLogClass(log.level)}">
+                <div class="d-flex justify-content-between">
+                    <span class="badge bg-${getLogColor(log.level)} me-2">${log.level}</span>
+                    <small class="text-muted">${formatDateTime(log.timestamp)}</small>
+                </div>
+                <div class="mt-1">
+                    <strong>${log.message}</strong>
+                    ${log.details ? `<br><small class="text-muted">${log.details}</small>` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        // Scroll to bottom
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+        
+    } catch (error) {
+        console.error('Error loading system logs:', error);
+    }
+}
+
+async function loadUsageChart() {
+    // Placeholder for usage chart - would use Chart.js or similar
+    const chartContainer = document.getElementById('usageChart');
+    chartContainer.innerHTML = `
+        <div class="text-center text-muted py-5">
+            <i class="fas fa-chart-area fa-3x mb-3"></i>
+            <p>Gráfico de uso de recursos<br><small>Implementar con Chart.js o similar</small></p>
+        </div>
+    `;
+}
+
+async function loadStatusChart() {
+    // Placeholder for status chart - would use Chart.js or similar
+    const chartContainer = document.getElementById('appStatusChart');
+    chartContainer.innerHTML = `
+        <div class="text-center text-muted py-5">
+            <i class="fas fa-pie-chart fa-3x mb-3"></i>
+            <p>Estado de aplicaciones<br><small>Implementar con Chart.js o similar</small></p>
+        </div>
+    `;
+}
+
+// Utility functions
+function updateProgressBar(barId, percentage) {
+    const bar = document.getElementById(barId);
+    if (bar) {
+        bar.style.width = percentage + '%';
+    }
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'active': return 'bg-success';
+        case 'inactive': return 'bg-secondary';
+        case 'error': return 'bg-danger';
+        default: return 'bg-warning';
+    }
+}
+
+function getStatusIcon(status) {
+    switch (status) {
+        case 'active': return 'fa-play-circle';
+        case 'inactive': return 'fa-pause-circle';
+        case 'error': return 'fa-exclamation-triangle';
+        default: return 'fa-question-circle';
+    }
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case 'active': return 'Activa';
+        case 'inactive': return 'Inactiva';
+        case 'error': return 'Error';
+        default: return 'Desconocido';
+    }
+}
+
+function getLogColor(level) {
+    switch (level) {
+        case 'ERROR': return 'danger';
+        case 'WARNING': return 'warning';
+        case 'INFO': return 'info';
+        default: return 'secondary';
+    }
+}
+
+function getLogClass(level) {
+    switch (level) {
+        case 'ERROR': return 'border-start border-danger border-3';
+        case 'WARNING': return 'border-start border-warning border-3';
+        case 'INFO': return 'border-start border-info border-3';
+        default: return 'border-start border-secondary border-3';
+    }
+}
+
+function formatDateTime(timestamp) {
+    return new Date(timestamp).toLocaleString();
+}
+
+// Control functions
+function refreshMonitoring() {
+    loadMonitoringData();
+}
+
+function changeTimeRange(hours) {
+    currentTimeRange = hours;
+    loadMonitoringData();
+}
+
+function showMetric(metric) {
+    // Update button states
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Update performance table highlighting
+    // Implementation would depend on specific requirements
+}
+
+function filterLogs() {
+    const level = document.getElementById('logLevelFilter').value;
+    const logs = document.querySelectorAll('.log-entry');
+    
+    logs.forEach(log => {
+        const logLevel = log.querySelector('.badge').textContent;
+        log.style.display = (!level || logLevel === level) ? 'block' : 'none';
+    });
+}
+
+function clearLogs() {
+    if (confirm('¿Está seguro de que desea limpiar todos los logs?')) {
+        document.getElementById('systemLogs').innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-broom me-2"></i>Logs limpiados
+            </div>
+        `;
+    }
+}
+
+function viewAppDetails(appId) {
+    // Redirect to app details or open modal
+    window.location.href = `/domains#app-${appId}`;
+}
+
+async function restartApp(appId) {
+    try {
+        await axios.post(`/api/v1/applications/${appId}/stop`);
+        setTimeout(async () => {
+            await axios.post(`/api/v1/applications/${appId}/start`);
+            showAlert('Aplicación reiniciada correctamente', 'success');
+            loadApplicationPerformance();
+        }, 2000);
+    } catch (error) {
+        showAlert('Error al reiniciar la aplicación', 'danger');
+    }
+}
+
+function startRealTimeMonitoring() {
+    // Refresh data every 30 seconds
+    refreshInterval = setInterval(loadMonitoringData, 30000);
+}
+
+function stopRealTimeMonitoring() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+}
+
+function showAlert(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const main = document.querySelector('main');
+    main.insertBefore(alert, main.firstChild);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', stopRealTimeMonitoring);
+</script>
+{% endblock %}

@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - WebApp Manager SAAS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tachometer-alt me-2 text-primary"></i>
+                Dashboard
+            </h1>
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="refreshStats()">
+                    <i class="fas fa-sync-alt me-1"></i>Actualizar
+                </button>
+                <span class="badge bg-secondary" id="lastUpdate">Cargando...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="card-title">Aplicaciones Totales</div>
+                        <div class="h2 mb-0" id="totalApps">--</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-cubes fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="card-title">Apps Activas</div>
+                        <div class="h2 mb-0" id="activeApps">--</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-play-circle fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="card-title">Apps Inactivas</div>
+                        <div class="h2 mb-0" id="inactiveApps">--</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-pause-circle fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="card-title">Uso de CPU</div>
+                        <div class="h2 mb-0" id="cpuUsage">--%</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-microchip fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Usage -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-microchip me-2"></i>Uso de CPU
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-2" style="height: 20px;">
+                    <div class="progress-bar bg-info" role="progressbar" 
+                         style="width: 0%" id="cpuBar">0%</div>
+                </div>
+                <small class="text-muted">Promedio del sistema</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-memory me-2"></i>Uso de Memoria
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-2" style="height: 20px;">
+                    <div class="progress-bar bg-warning" role="progressbar" 
+                         style="width: 0%" id="memoryBar">0%</div>
+                </div>
+                <small class="text-muted">RAM utilizada</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-hdd me-2"></i>Uso de Disco
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-2" style="height: 20px;">
+                    <div class="progress-bar bg-danger" role="progressbar" 
+                         style="width: 0%" id="diskBar">0%</div>
+                </div>
+                <small class="text-muted">Almacenamiento usado</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Applications -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Aplicaciones Recientes
+                </h5>
+                <a href="/domains" class="btn btn-sm btn-primary">Ver Todas</a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Dominio</th>
+                                <th>Tipo</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentApps">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando aplicaciones...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clock me-2"></i>Actividad Reciente
+                </h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="activityLog">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Cargando actividad...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let refreshInterval;
+
+// Load dashboard data
+async function loadDashboardData() {
+    try {
+        // Load system stats
+        const statsResponse = await axios.get('/api/v1/system/stats');
+        const stats = statsResponse.data;
+        
+        // Update statistics cards
+        document.getElementById('totalApps').textContent = stats.total_applications;
+        document.getElementById('activeApps').textContent = stats.active_applications;
+        document.getElementById('inactiveApps').textContent = stats.inactive_applications;
+        
+        // Update usage bars
+        const cpu = Math.round(stats.system_usage.cpu_usage);
+        const memory = Math.round(stats.system_usage.memory_usage);
+        const disk = Math.round(stats.system_usage.disk_usage);
+        
+        document.getElementById('cpuUsage').textContent = cpu + '%';
+        updateProgressBar('cpuBar', cpu);
+        updateProgressBar('memoryBar', memory);
+        updateProgressBar('diskBar', disk);
+        
+        // Load applications
+        const appsResponse = await axios.get('/api/v1/applications');
+        const apps = appsResponse.data.slice(0, 5); // Show only 5 recent apps
+        
+        displayRecentApps(apps);
+        
+        // Load activity log
+        const logsResponse = await axios.get('/api/v1/system/logs?limit=10');
+        displayActivityLog(logsResponse.data.logs);
+        
+        // Update last update time
+        document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleTimeString();
+        
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showAlert('Error al cargar los datos del dashboard', 'danger');
+    }
+}
+
+function updateProgressBar(barId, percentage) {
+    const bar = document.getElementById(barId);
+    bar.style.width = percentage + '%';
+    bar.textContent = percentage + '%';
+}
+
+function displayRecentApps(apps) {
+    const tbody = document.getElementById('recentApps');
+    
+    if (apps.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    <i class="fas fa-inbox me-2"></i>No hay aplicaciones
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = apps.map(app => `
+        <tr>
+            <td>
+                <strong>${app.name}</strong>
+            </td>
+            <td>
+                <a href="https://${app.domain}" target="_blank" class="text-decoration-none">
+                    ${app.domain} <i class="fas fa-external-link-alt ms-1 text-muted small"></i>
+                </a>
+            </td>
+            <td>
+                <span class="badge bg-secondary">${app.app_type}</span>
+            </td>
+            <td>
+                <span class="badge ${getStatusBadgeClass(app.status)}">
+                    <i class="fas ${getStatusIcon(app.status)} me-1"></i>
+                    ${getStatusText(app.status)}
+                </span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-success" onclick="toggleApp(${app.id}, 'start')" 
+                            ${app.status === 'active' ? 'disabled' : ''}>
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="toggleApp(${app.id}, 'stop')"
+                            ${app.status === 'inactive' ? 'disabled' : ''}>
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function displayActivityLog(logs) {
+    const logContainer = document.getElementById('activityLog');
+    
+    if (logs.length === 0) {
+        logContainer.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-inbox me-2"></i>No hay actividad reciente
+            </div>`;
+        return;
+    }
+    
+    logContainer.innerHTML = logs.map(log => `
+        <div class="d-flex mb-3">
+            <div class="flex-shrink-0">
+                <i class="fas ${getLogIcon(log.level)} text-${getLogColor(log.level)}"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+                <div class="fw-bold">${log.message}</div>
+                <small class="text-muted">${formatDateTime(log.timestamp)}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'active': return 'bg-success';
+        case 'inactive': return 'bg-secondary';
+        case 'error': return 'bg-danger';
+        default: return 'bg-warning';
+    }
+}
+
+function getStatusIcon(status) {
+    switch (status) {
+        case 'active': return 'fa-play-circle';
+        case 'inactive': return 'fa-pause-circle';
+        case 'error': return 'fa-exclamation-triangle';
+        default: return 'fa-question-circle';
+    }
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case 'active': return 'Activa';
+        case 'inactive': return 'Inactiva';
+        case 'error': return 'Error';
+        default: return 'Desconocido';
+    }
+}
+
+function getLogIcon(level) {
+    switch (level) {
+        case 'ERROR': return 'fa-exclamation-triangle';
+        case 'WARNING': return 'fa-exclamation-circle';
+        case 'INFO': return 'fa-info-circle';
+        default: return 'fa-circle';
+    }
+}
+
+function getLogColor(level) {
+    switch (level) {
+        case 'ERROR': return 'danger';
+        case 'WARNING': return 'warning';
+        case 'INFO': return 'info';
+        default: return 'secondary';
+    }
+}
+
+function formatDateTime(timestamp) {
+    return new Date(timestamp).toLocaleString();
+}
+
+async function toggleApp(appId, action) {
+    try {
+        await axios.post(`/api/v1/applications/${appId}/${action}`);
+        showAlert(`Aplicación ${action === 'start' ? 'iniciada' : 'detenida'} correctamente`, 'success');
+        loadDashboardData(); // Refresh data
+    } catch (error) {
+        showAlert(`Error al ${action === 'start' ? 'iniciar' : 'detener'} la aplicación`, 'danger');
+    }
+}
+
+function refreshStats() {
+    loadDashboardData();
+}
+
+function showAlert(message, type) {
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert at the beginning of main content
+    const main = document.querySelector('main');
+    main.insertBefore(alert, main.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    
+    // Set up auto-refresh every 30 seconds
+    refreshInterval = setInterval(loadDashboardData, 30000);
+});
+
+// Clean up interval when page unloads
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+</script>
+{% endblock %}

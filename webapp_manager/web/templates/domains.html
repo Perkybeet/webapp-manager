@@ -1,0 +1,642 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Dominios - WebApp Manager SAAS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-globe me-2 text-primary"></i>
+                Gestión de Dominios
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAppModal">
+                <i class="fas fa-plus me-2"></i>Nueva Aplicación
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Applications Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Aplicaciones
+                </h5>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="refreshApps()">
+                        <i class="fas fa-sync-alt me-1"></i>Actualizar
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                                data-bs-toggle="dropdown">
+                            <i class="fas fa-filter me-1"></i>Filtrar
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="filterApps('all')">Todas</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="filterApps('active')">Activas</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="filterApps('inactive')">Inactivas</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="filterApps('error')">Con Errores</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Dominio</th>
+                                <th>Tipo</th>
+                                <th>Puerto</th>
+                                <th>Estado</th>
+                                <th>SSL</th>
+                                <th>Creado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appsTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando aplicaciones...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Application Modal -->
+<div class="modal fade" id="addAppModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Nueva Aplicación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addAppForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="appName" class="form-label">Nombre de la Aplicación</label>
+                                <input type="text" class="form-control" id="appName" name="name" 
+                                       placeholder="mi-app" required>
+                                <div class="form-text">Solo letras, números y guiones</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="appDomain" class="form-label">Dominio</label>
+                                <input type="text" class="form-control" id="appDomain" name="domain" 
+                                       placeholder="miapp.ejemplo.com" required>
+                                <div class="form-text">Dominio completo (FQDN)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="appType" class="form-label">Tipo de Aplicación</label>
+                                <select class="form-control" id="appType" name="app_type" required>
+                                    <option value="">Seleccionar tipo...</option>
+                                    <option value="nextjs">Next.js</option>
+                                    <option value="fastapi">FastAPI</option>
+                                    <option value="nodejs">Node.js</option>
+                                    <option value="static">Sitio Estático</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="appPort" class="form-label">Puerto</label>
+                                <input type="number" class="form-control" id="appPort" name="port" 
+                                       placeholder="3000" min="1000" max="65535" required>
+                                <div class="form-text">Puerto para la aplicación (1000-65535)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="appDirectory" class="form-label">Directorio de la Aplicación</label>
+                        <input type="text" class="form-control" id="appDirectory" name="directory_path" 
+                               placeholder="/var/www/mi-app" required>
+                        <div class="form-text">Ruta completa donde se instalará la aplicación</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="appGitUrl" class="form-label">URL del Repositorio Git (Opcional)</label>
+                        <input type="url" class="form-control" id="appGitUrl" name="git_url" 
+                               placeholder="https://github.com/usuario/mi-app.git">
+                        <div class="form-text">URL del repositorio para clonar el código</div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Nota:</strong> La aplicación se configurará automáticamente con nginx como proxy reverso 
+                        y systemd para la gestión del servicio.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="createApp()">
+                    <i class="fas fa-plus me-2"></i>Crear Aplicación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Application Modal -->
+<div class="modal fade" id="editAppModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Editar Aplicación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editAppForm">
+                    <input type="hidden" id="editAppId" name="id">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editAppName" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="editAppName" readonly>
+                                <div class="form-text">El nombre no se puede modificar</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editAppDomain" class="form-label">Dominio</label>
+                                <input type="text" class="form-control" id="editAppDomain" name="domain">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editAppType" class="form-label">Tipo</label>
+                                <input type="text" class="form-control" id="editAppType" readonly>
+                                <div class="form-text">El tipo no se puede modificar</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editAppPort" class="form-label">Puerto</label>
+                                <input type="number" class="form-control" id="editAppPort" name="port" 
+                                       min="1000" max="65535">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editAppStatus" class="form-label">Estado</label>
+                        <select class="form-control" id="editAppStatus" name="status">
+                            <option value="active">Activa</option>
+                            <option value="inactive">Inactiva</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="updateApp()">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Application Details Modal -->
+<div class="modal fade" id="appDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>Detalles de la Aplicación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="appDetailsContent">
+                    <div class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Cargando detalles...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentFilter = 'all';
+let applications = [];
+
+// Load applications
+async function loadApplications() {
+    try {
+        const response = await axios.get('/api/v1/applications');
+        applications = response.data;
+        displayApplications();
+    } catch (error) {
+        console.error('Error loading applications:', error);
+        showAlert('Error al cargar las aplicaciones', 'danger');
+    }
+}
+
+function displayApplications() {
+    const tbody = document.getElementById('appsTableBody');
+    let filteredApps = applications;
+    
+    // Apply filter
+    if (currentFilter !== 'all') {
+        filteredApps = applications.filter(app => app.status === currentFilter);
+    }
+    
+    if (filteredApps.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    <i class="fas fa-inbox me-2"></i>No hay aplicaciones que mostrar
+                </td>
+            </tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = filteredApps.map(app => `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-cube me-2 text-muted"></i>
+                    <strong>${app.name}</strong>
+                </div>
+            </td>
+            <td>
+                <a href="https://${app.domain}" target="_blank" class="text-decoration-none">
+                    ${app.domain} <i class="fas fa-external-link-alt ms-1 text-muted small"></i>
+                </a>
+            </td>
+            <td>
+                <span class="badge bg-info">${app.app_type}</span>
+            </td>
+            <td>
+                <code>${app.port}</code>
+            </td>
+            <td>
+                <span class="badge ${getStatusBadgeClass(app.status)}">
+                    <i class="fas ${getStatusIcon(app.status)} me-1"></i>
+                    ${getStatusText(app.status)}
+                </span>
+            </td>
+            <td>
+                ${app.ssl_enabled 
+                    ? '<i class="fas fa-shield-alt text-success" title="SSL Habilitado"></i>'
+                    : '<i class="fas fa-shield-alt text-muted" title="SSL Deshabilitado"></i>'
+                }
+            </td>
+            <td>
+                <small class="text-muted">${formatDate(app.created_at)}</small>
+            </td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                            data-bs-toggle="dropdown">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="showAppDetails(${app.id})">
+                                <i class="fas fa-info-circle me-2"></i>Ver Detalles
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="editApp(${app.id})">
+                                <i class="fas fa-edit me-2"></i>Editar
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item ${app.status === 'active' ? 'disabled' : ''}" 
+                               href="#" onclick="startApp(${app.id})">
+                                <i class="fas fa-play me-2 text-success"></i>Iniciar
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item ${app.status === 'inactive' ? 'disabled' : ''}" 
+                               href="#" onclick="stopApp(${app.id})">
+                                <i class="fas fa-stop me-2 text-warning"></i>Detener
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="restartApp(${app.id})">
+                                <i class="fas fa-redo me-2 text-info"></i>Reiniciar
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="#" onclick="deleteApp(${app.id}, '${app.name}')">
+                                <i class="fas fa-trash me-2"></i>Eliminar
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Application management functions
+async function createApp() {
+    try {
+        const form = document.getElementById('addAppForm');
+        const formData = new FormData(form);
+        
+        const appData = {
+            name: formData.get('name'),
+            domain: formData.get('domain'),
+            app_type: formData.get('app_type'),
+            port: parseInt(formData.get('port')),
+            directory_path: formData.get('directory_path'),
+            git_url: formData.get('git_url') || null
+        };
+        
+        await axios.post('/api/v1/applications', appData);
+        
+        // Close modal and refresh
+        bootstrap.Modal.getInstance(document.getElementById('addAppModal')).hide();
+        showAlert('Aplicación creada correctamente', 'success');
+        form.reset();
+        loadApplications();
+        
+    } catch (error) {
+        console.error('Error creating application:', error);
+        const message = error.response?.data?.detail || 'Error al crear la aplicación';
+        showAlert(message, 'danger');
+    }
+}
+
+async function editApp(appId) {
+    try {
+        const app = applications.find(a => a.id === appId);
+        if (!app) return;
+        
+        // Populate edit form
+        document.getElementById('editAppId').value = app.id;
+        document.getElementById('editAppName').value = app.name;
+        document.getElementById('editAppDomain').value = app.domain;
+        document.getElementById('editAppType').value = app.app_type;
+        document.getElementById('editAppPort').value = app.port;
+        document.getElementById('editAppStatus').value = app.status;
+        
+        // Show modal
+        new bootstrap.Modal(document.getElementById('editAppModal')).show();
+        
+    } catch (error) {
+        console.error('Error editing application:', error);
+        showAlert('Error al cargar los datos de la aplicación', 'danger');
+    }
+}
+
+async function updateApp() {
+    try {
+        const form = document.getElementById('editAppForm');
+        const formData = new FormData(form);
+        const appId = formData.get('id');
+        
+        const updateData = {
+            domain: formData.get('domain'),
+            port: parseInt(formData.get('port')),
+            status: formData.get('status')
+        };
+        
+        await axios.put(`/api/v1/applications/${appId}`, updateData);
+        
+        // Close modal and refresh
+        bootstrap.Modal.getInstance(document.getElementById('editAppModal')).hide();
+        showAlert('Aplicación actualizada correctamente', 'success');
+        loadApplications();
+        
+    } catch (error) {
+        console.error('Error updating application:', error);
+        const message = error.response?.data?.detail || 'Error al actualizar la aplicación';
+        showAlert(message, 'danger');
+    }
+}
+
+async function deleteApp(appId, appName) {
+    if (!confirm(`¿Está seguro de que desea eliminar la aplicación "${appName}"?`)) {
+        return;
+    }
+    
+    try {
+        await axios.delete(`/api/v1/applications/${appId}`);
+        showAlert('Aplicación eliminada correctamente', 'success');
+        loadApplications();
+        
+    } catch (error) {
+        console.error('Error deleting application:', error);
+        const message = error.response?.data?.detail || 'Error al eliminar la aplicación';
+        showAlert(message, 'danger');
+    }
+}
+
+async function startApp(appId) {
+    try {
+        await axios.post(`/api/v1/applications/${appId}/start`);
+        showAlert('Aplicación iniciada correctamente', 'success');
+        loadApplications();
+    } catch (error) {
+        showAlert('Error al iniciar la aplicación', 'danger');
+    }
+}
+
+async function stopApp(appId) {
+    try {
+        await axios.post(`/api/v1/applications/${appId}/stop`);
+        showAlert('Aplicación detenida correctamente', 'success');
+        loadApplications();
+    } catch (error) {
+        showAlert('Error al detener la aplicación', 'danger');
+    }
+}
+
+async function restartApp(appId) {
+    try {
+        await stopApp(appId);
+        setTimeout(() => startApp(appId), 2000);
+    } catch (error) {
+        showAlert('Error al reiniciar la aplicación', 'danger');
+    }
+}
+
+async function showAppDetails(appId) {
+    try {
+        const response = await axios.get(`/api/v1/applications/${appId}`);
+        const app = response.data;
+        
+        // Get usage data
+        const usageResponse = await axios.get(`/api/v1/system/usage/${appId}?hours=24`);
+        const usage = usageResponse.data.usage_history;
+        
+        // Get logs
+        const logsResponse = await axios.get(`/api/v1/system/logs?app_id=${appId}&limit=10`);
+        const logs = logsResponse.data.logs;
+        
+        // Populate details modal
+        document.getElementById('appDetailsContent').innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Información General</h6>
+                    <table class="table table-sm">
+                        <tr><td>Nombre:</td><td><strong>${app.name}</strong></td></tr>
+                        <tr><td>Dominio:</td><td>${app.domain}</td></tr>
+                        <tr><td>Tipo:</td><td>${app.app_type}</td></tr>
+                        <tr><td>Puerto:</td><td>${app.port}</td></tr>
+                        <tr><td>Estado:</td><td><span class="badge ${getStatusBadgeClass(app.status)}">${getStatusText(app.status)}</span></td></tr>
+                        <tr><td>SSL:</td><td>${app.ssl_enabled ? 'Habilitado' : 'Deshabilitado'}</td></tr>
+                        <tr><td>Directorio:</td><td><code>${app.directory_path}</code></td></tr>
+                        <tr><td>Git URL:</td><td>${app.git_url || 'N/A'}</td></tr>
+                        <tr><td>Creado:</td><td>${formatDate(app.created_at)}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Uso de Recursos (Últimas 24h)</h6>
+                    ${usage.length > 0 ? `
+                        <div class="mb-3">
+                            <small class="text-muted">CPU Promedio:</small>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" style="width: ${Math.round(usage.reduce((a, u) => a + u.cpu_usage, 0) / usage.length)}%"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Memoria Promedio:</small>
+                            <div class="progress">
+                                <div class="progress-bar bg-warning" style="width: ${Math.round(usage.reduce((a, u) => a + u.memory_usage, 0) / usage.length)}%"></div>
+                            </div>
+                        </div>
+                    ` : '<p class="text-muted">No hay datos de uso disponibles</p>'}
+                    
+                    <h6 class="mt-4">Logs Recientes</h6>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        ${logs.length > 0 ? logs.map(log => `
+                            <div class="d-flex mb-2">
+                                <span class="badge bg-${getLogColor(log.level)} me-2">${log.level}</span>
+                                <div>
+                                    <div class="small">${log.message}</div>
+                                    <div class="text-muted" style="font-size: 0.8em;">${formatDateTime(log.timestamp)}</div>
+                                </div>
+                            </div>
+                        `).join('') : '<p class="text-muted">No hay logs disponibles</p>'}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        new bootstrap.Modal(document.getElementById('appDetailsModal')).show();
+        
+    } catch (error) {
+        console.error('Error loading application details:', error);
+        showAlert('Error al cargar los detalles de la aplicación', 'danger');
+    }
+}
+
+// Utility functions
+function filterApps(filter) {
+    currentFilter = filter;
+    displayApplications();
+}
+
+function refreshApps() {
+    loadApplications();
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'active': return 'bg-success';
+        case 'inactive': return 'bg-secondary';
+        case 'error': return 'bg-danger';
+        default: return 'bg-warning';
+    }
+}
+
+function getStatusIcon(status) {
+    switch (status) {
+        case 'active': return 'fa-play-circle';
+        case 'inactive': return 'fa-pause-circle';
+        case 'error': return 'fa-exclamation-triangle';
+        default: return 'fa-question-circle';
+    }
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case 'active': return 'Activa';
+        case 'inactive': return 'Inactiva';
+        case 'error': return 'Error';
+        default: return 'Desconocido';
+    }
+}
+
+function getLogColor(level) {
+    switch (level) {
+        case 'ERROR': return 'danger';
+        case 'WARNING': return 'warning';
+        case 'INFO': return 'info';
+        default: return 'secondary';
+    }
+}
+
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleString();
+}
+
+function formatDateTime(timestamp) {
+    return new Date(timestamp).toLocaleString();
+}
+
+function showAlert(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const main = document.querySelector('main');
+    main.insertBefore(alert, main.firstChild);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadApplications();
+});
+</script>
+{% endblock %}
