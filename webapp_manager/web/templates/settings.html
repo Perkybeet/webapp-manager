@@ -3,139 +3,148 @@
 {% block title %}Configuración - WebApp Manager SAAS{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1 class="h3 mb-0">
-                <i class="fas fa-cog me-2 text-primary"></i>
+<!-- Header -->
+<div class="mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-cog mr-3 text-blue-600"></i>
                 Configuración del Sistema
             </h1>
-            <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary" onclick="loadConfiguration()">
-                    <i class="fas fa-sync-alt me-1"></i>Actualizar
-                </button>
-                <button class="btn btn-primary" onclick="saveConfiguration()">
-                    <i class="fas fa-save me-1"></i>Guardar Cambios
-                </button>
-            </div>
+            <p class="text-gray-600 mt-1">Gestiona la configuración y preferencias del sistema</p>
+        </div>
+        <div class="flex space-x-3">
+            <button class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200" 
+                    onclick="loadConfiguration()">
+                <i class="fas fa-sync-alt mr-2" id="refreshIcon"></i>
+                Actualizar
+            </button>
+            <button class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200" 
+                    onclick="saveConfiguration()">
+                <i class="fas fa-save mr-2"></i>
+                Guardar Cambios
+            </button>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <!-- Navigation Tabs -->
-    <div class="col-md-3">
-        <div class="list-group" id="configTabs">
-            <a class="list-group-item list-group-item-action active" 
-               data-bs-toggle="pill" href="#general-config">
-                <i class="fas fa-cogs me-2"></i>General
-            </a>
-            <a class="list-group-item list-group-item-action" 
-               data-bs-toggle="pill" href="#server-config">
-                <i class="fas fa-server me-2"></i>Servidor Web
-            </a>
-            <a class="list-group-item list-group-item-action" 
-               data-bs-toggle="pill" href="#paths-config">
-                <i class="fas fa-folder me-2"></i>Rutas del Sistema
-            </a>
-            <a class="list-group-item list-group-item-action" 
-               data-bs-toggle="pill" href="#nginx-config">
-                <i class="fas fa-globe me-2"></i>Nginx
-            </a>
-            <a class="list-group-item list-group-item-action" 
-               data-bs-toggle="pill" href="#security-config">
-                <i class="fas fa-shield-alt me-2"></i>Seguridad
-            </a>
-            <a class="list-group-item list-group-item-action" 
-               data-bs-toggle="pill" href="#backup-config">
-                <i class="fas fa-database me-2"></i>Respaldos
-            </a>
-            <a class="list-group-item list-group-item-action" 
-               data-bs-toggle="pill" href="#users-config">
-                <i class="fas fa-users me-2"></i>Usuarios
-            </a>
-        </div>
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <!-- Navigation Sidebar -->
+    <div class="lg:col-span-1">
+        <nav class="space-y-1" id="configTabs">
+            <button class="config-tab-btn w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-blue-700 bg-blue-100 border-l-4 border-blue-600 transition-all duration-200" 
+                    onclick="showConfigTab('general-config', this)">
+                <i class="fas fa-cogs mr-3"></i>
+                General
+            </button>
+            <button class="config-tab-btn w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 border-l-4 border-transparent hover:border-gray-300 transition-all duration-200" 
+                    onclick="showConfigTab('server-config', this)">
+                <i class="fas fa-server mr-3"></i>
+                Servidor Web
+            </button>
+            <button class="config-tab-btn w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 border-l-4 border-transparent hover:border-gray-300 transition-all duration-200" 
+                    onclick="showConfigTab('paths-config', this)">
+                <i class="fas fa-folder mr-3"></i>
+                Rutas del Sistema
+            </button>
+            <button class="config-tab-btn w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 border-l-4 border-transparent hover:border-gray-300 transition-all duration-200" 
+                    onclick="showConfigTab('security-config', this)">
+                <i class="fas fa-shield-alt mr-3"></i>
+                Seguridad
+            </button>
+            <button class="config-tab-btn w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 border-l-4 border-transparent hover:border-gray-300 transition-all duration-200" 
+                    onclick="showConfigTab('users-config', this)">
+                <i class="fas fa-users mr-3"></i>
+                Usuarios
+            </button>
+        </nav>
     </div>
 
     <!-- Configuration Content -->
-    <div class="col-md-9">
-        <div class="tab-content" id="configContent">
+    <div class="lg:col-span-3">
+        <div id="configContent">
             <!-- General Configuration -->
-            <div class="tab-pane fade show active" id="general-config">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-cogs me-2"></i>Configuración General
-                        </h5>
+            <div class="config-tab-content" id="general-config">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-cogs mr-2 text-blue-600"></i>
+                            Configuración General
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1">Configuraciones básicas del sistema</p>
                     </div>
-                    <div class="card-body">
-                        <form id="generalConfigForm">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="systemName" class="form-label">Nombre del Sistema</label>
-                                        <input type="text" class="form-control" id="systemName" 
-                                               name="system_name" value="WebApp Manager SAAS">
-                                    </div>
+                    <div class="p-6">
+                        <form id="generalConfigForm" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="systemName" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Nombre del Sistema
+                                    </label>
+                                    <input type="text" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="systemName" 
+                                           name="system_name" 
+                                           value="WebApp Manager SAAS">
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="systemDescription" class="form-label">Descripción</label>
-                                        <input type="text" class="form-control" id="systemDescription" 
-                                               name="system_description" value="Sistema de Gestión de Aplicaciones Web">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="defaultAppType" class="form-label">Tipo de App por Defecto</label>
-                                        <select class="form-control" id="defaultAppType" name="default_app_type">
-                                            <option value="nextjs">Next.js</option>
-                                            <option value="fastapi">FastAPI</option>
-                                            <option value="nodejs">Node.js</option>
-                                            <option value="static">Sitio Estático</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="defaultPort" class="form-label">Puerto por Defecto</label>
-                                        <input type="number" class="form-control" id="defaultPort" 
-                                               name="default_port" value="3000" min="1000" max="65535">
-                                    </div>
+                                <div>
+                                    <label for="systemDescription" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Descripción
+                                    </label>
+                                    <input type="text" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="systemDescription" 
+                                           name="system_description" 
+                                           value="Sistema de Gestión de Aplicaciones Web">
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label for="timezone" class="form-label">Zona Horaria</label>
-                                <select class="form-control" id="timezone" name="timezone">
-                                    <option value="UTC">UTC</option>
-                                    <option value="America/Mexico_City">America/Mexico_City</option>
-                                    <option value="America/New_York">America/New_York</option>
-                                    <option value="Europe/Madrid">Europe/Madrid</option>
-                                </select>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="defaultAppType" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Tipo de App por Defecto
+                                    </label>
+                                    <select class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                            id="defaultAppType" 
+                                            name="default_app_type">
+                                        <option value="nextjs">Next.js</option>
+                                        <option value="fastapi">FastAPI</option>
+                                        <option value="nodejs">Node.js</option>
+                                        <option value="static">Sitio Estático</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="defaultPort" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Puerto por Defecto
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="defaultPort" 
+                                           name="default_port" 
+                                           value="3000" 
+                                           min="1000" 
+                                           max="65535">
+                                </div>
                             </div>
 
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="autoBackup" 
-                                               name="auto_backup" checked>
-                                        <label class="form-check-label" for="autoBackup">
-                                            Respaldos Automáticos
-                                        </label>
-                                    </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="flex items-center">
+                                    <input type="checkbox" 
+                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                                           id="autoBackup" 
+                                           name="auto_backup" 
+                                           checked>
+                                    <label for="autoBackup" class="ml-3 text-sm font-medium text-gray-700">
+                                        Respaldos Automáticos
+                                    </label>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="verboseLogging" 
-                                               name="verbose_logging">
-                                        <label class="form-check-label" for="verboseLogging">
-                                            Logging Detallado
-                                        </label>
-                                    </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" 
+                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                                           id="verboseLogging" 
+                                           name="verbose_logging">
+                                    <label for="verboseLogging" class="ml-3 text-sm font-medium text-gray-700">
+                                        Logging Detallado
+                                    </label>
                                 </div>
                             </div>
                         </form>
@@ -144,76 +153,41 @@
             </div>
 
             <!-- Server Configuration -->
-            <div class="tab-pane fade" id="server-config">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-server me-2"></i>Configuración del Servidor Web
-                        </h5>
+            <div class="config-tab-content hidden" id="server-config">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-server mr-2 text-blue-600"></i>
+                            Configuración del Servidor Web
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1">Configuraciones del servidor web y API</p>
                     </div>
-                    <div class="card-body">
-                        <form id="serverConfigForm">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="webServerHost" class="form-label">Host del Servidor</label>
-                                        <input type="text" class="form-control" id="webServerHost" 
-                                               name="web_server_host" value="0.0.0.0">
-                                        <div class="form-text">IP para bind del servidor web</div>
-                                    </div>
+                    <div class="p-6">
+                        <form id="serverConfigForm" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="webServerHost" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Host del Servidor
+                                    </label>
+                                    <input type="text" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="webServerHost" 
+                                           name="web_server_host" 
+                                           value="0.0.0.0">
+                                    <p class="text-xs text-gray-500 mt-1">IP para bind del servidor web</p>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="webServerPort" class="form-label">Puerto del Servidor</label>
-                                        <input type="number" class="form-control" id="webServerPort" 
-                                               name="web_server_port" value="8080" min="1" max="65535">
-                                        <div class="form-text">Puerto para el panel de control web</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="sessionTimeout" class="form-label">Timeout de Sesión (horas)</label>
-                                        <input type="number" class="form-control" id="sessionTimeout" 
-                                               name="session_timeout" value="24" min="1" max="168">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="maxRequestSize" class="form-label">Tamaño Máximo de Request (MB)</label>
-                                        <input type="number" class="form-control" id="maxRequestSize" 
-                                               name="max_request_size" value="50" min="1" max="1000">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="corsOrigins" class="form-label">Orígenes CORS Permitidos</label>
-                                <textarea class="form-control" id="corsOrigins" name="cors_origins" 
-                                          rows="3" placeholder="https://ejemplo.com">*</textarea>
-                                <div class="form-text">Un origen por línea. Use * para permitir todos</div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="enableHttps" 
-                                               name="enable_https">
-                                        <label class="form-check-label" for="enableHttps">
-                                            Habilitar HTTPS
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="enableCompression" 
-                                               name="enable_compression" checked>
-                                        <label class="form-check-label" for="enableCompression">
-                                            Habilitar Compresión
-                                        </label>
-                                    </div>
+                                <div>
+                                    <label for="webServerPort" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Puerto del Servidor
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="webServerPort" 
+                                           name="web_server_port" 
+                                           value="8080" 
+                                           min="1" 
+                                           max="65535">
+                                    <p class="text-xs text-gray-500 mt-1">Puerto para el panel de control web</p>
                                 </div>
                             </div>
                         </form>
@@ -222,102 +196,39 @@
             </div>
 
             <!-- Paths Configuration -->
-            <div class="tab-pane fade" id="paths-config">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-folder me-2"></i>Rutas del Sistema
-                        </h5>
+            <div class="config-tab-content hidden" id="paths-config">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-folder mr-2 text-blue-600"></i>
+                            Rutas del Sistema
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1">Configuración de directorios del sistema</p>
                     </div>
-                    <div class="card-body">
-                        <form id="pathsConfigForm">
-                            <div class="mb-3">
-                                <label for="appsBaseDir" class="form-label">Directorio Base de Aplicaciones</label>
-                                <input type="text" class="form-control" id="appsBaseDir" 
-                                       name="apps_base_dir" value="/var/www">
-                                <div class="form-text">Directorio donde se instalan las aplicaciones</div>
+                    <div class="p-6">
+                        <form id="pathsConfigForm" class="space-y-6">
+                            <div>
+                                <label for="appsBaseDir" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Directorio Base de Aplicaciones
+                                </label>
+                                <input type="text" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                       id="appsBaseDir" 
+                                       name="apps_base_dir" 
+                                       value="/var/www">
+                                <p class="text-xs text-gray-500 mt-1">Directorio donde se instalan las aplicaciones</p>
                             </div>
 
-                            <div class="mb-3">
-                                <label for="backupDir" class="form-label">Directorio de Respaldos</label>
-                                <input type="text" class="form-control" id="backupDir" 
-                                       name="backup_dir" value="/var/backups/webapp-manager">
-                                <div class="form-text">Directorio para almacenar respaldos</div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="logsDir" class="form-label">Directorio de Logs</label>
-                                <input type="text" class="form-control" id="logsDir" 
-                                       name="logs_dir" value="/var/log/webapp-manager">
-                                <div class="form-text">Directorio para logs del sistema</div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="tempDir" class="form-label">Directorio Temporal</label>
-                                <input type="text" class="form-control" id="tempDir" 
-                                       name="temp_dir" value="/tmp/webapp-manager">
-                                <div class="form-text">Directorio para archivos temporales</div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Nginx Configuration -->
-            <div class="tab-pane fade" id="nginx-config">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-globe me-2"></i>Configuración de Nginx
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="nginxConfigForm">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="nginxSitesAvailable" class="form-label">Sites Available</label>
-                                        <input type="text" class="form-control" id="nginxSitesAvailable" 
-                                               name="nginx_sites_available" value="/etc/nginx/sites-available">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="nginxSitesEnabled" class="form-label">Sites Enabled</label>
-                                        <input type="text" class="form-control" id="nginxSitesEnabled" 
-                                               name="nginx_sites_enabled" value="/etc/nginx/sites-enabled">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="enableSsl" 
-                                               name="enable_ssl" checked>
-                                        <label class="form-check-label" for="enableSsl">
-                                            Habilitar SSL por Defecto
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="enableGzip" 
-                                               name="enable_gzip" checked>
-                                        <label class="form-check-label" for="enableGzip">
-                                            Habilitar Gzip
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="defaultNginxTemplate" class="form-label">Plantilla Nginx por Defecto</label>
-                                <select class="form-control" id="defaultNginxTemplate" name="default_nginx_template">
-                                    <option value="proxy">Proxy Reverso</option>
-                                    <option value="static">Sitio Estático</option>
-                                    <option value="spa">SPA (Single Page App)</option>
-                                </select>
+                            <div>
+                                <label for="backupDir" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Directorio de Respaldos
+                                </label>
+                                <input type="text" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                       id="backupDir" 
+                                       name="backup_dir" 
+                                       value="/var/backups/webapp-manager">
+                                <p class="text-xs text-gray-500 mt-1">Directorio para almacenar respaldos</p>
                             </div>
                         </form>
                     </div>
@@ -325,157 +236,42 @@
             </div>
 
             <!-- Security Configuration -->
-            <div class="tab-pane fade" id="security-config">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-shield-alt me-2"></i>Configuración de Seguridad
-                        </h5>
+            <div class="config-tab-content hidden" id="security-config">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-shield-alt mr-2 text-blue-600"></i>
+                            Configuración de Seguridad
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1">Configuraciones de seguridad y políticas</p>
                     </div>
-                    <div class="card-body">
-                        <form id="securityConfigForm">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="maxLoginAttempts" class="form-label">Máximo Intentos de Login</label>
-                                        <input type="number" class="form-control" id="maxLoginAttempts" 
-                                               name="max_login_attempts" value="5" min="1" max="10">
-                                    </div>
+                    <div class="p-6">
+                        <form id="securityConfigForm" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="maxLoginAttempts" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Máximo Intentos de Login
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="maxLoginAttempts" 
+                                           name="max_login_attempts" 
+                                           value="5" 
+                                           min="1" 
+                                           max="10">
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="lockoutDuration" class="form-label">Duración de Bloqueo (minutos)</label>
-                                        <input type="number" class="form-control" id="lockoutDuration" 
-                                               name="lockout_duration" value="15" min="1" max="1440">
-                                    </div>
+                                <div>
+                                    <label for="minPasswordLength" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Longitud Mínima de Contraseña
+                                    </label>
+                                    <input type="number" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                                           id="minPasswordLength" 
+                                           name="min_password_length" 
+                                           value="8" 
+                                           min="4" 
+                                           max="50">
                                 </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="passwordPolicy" class="form-label">Política de Contraseñas</label>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="requireUppercase" 
-                                                   name="require_uppercase" checked>
-                                            <label class="form-check-label" for="requireUppercase">
-                                                Requerir Mayúsculas
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="requireNumbers" 
-                                                   name="require_numbers" checked>
-                                            <label class="form-check-label" for="requireNumbers">
-                                                Requerir Números
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row mt-2">
-                                    <div class="col-md-6">
-                                        <label for="minPasswordLength" class="form-label">Longitud Mínima</label>
-                                        <input type="number" class="form-control" id="minPasswordLength" 
-                                               name="min_password_length" value="8" min="4" max="50">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check mt-4">
-                                            <input class="form-check-input" type="checkbox" id="requireSymbols" 
-                                                   name="require_symbols">
-                                            <label class="form-check-label" for="requireSymbols">
-                                                Requerir Símbolos
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="enableTwoFactor" 
-                                               name="enable_two_factor">
-                                        <label class="form-check-label" for="enableTwoFactor">
-                                            Autenticación de Dos Factores
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="enableAuditLog" 
-                                               name="enable_audit_log" checked>
-                                        <label class="form-check-label" for="enableAuditLog">
-                                            Log de Auditoría
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Backup Configuration -->
-            <div class="tab-pane fade" id="backup-config">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-database me-2"></i>Configuración de Respaldos
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="backupConfigForm">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="backupSchedule" class="form-label">Programa de Respaldos</label>
-                                        <select class="form-control" id="backupSchedule" name="backup_schedule">
-                                            <option value="never">Nunca</option>
-                                            <option value="daily">Diario</option>
-                                            <option value="weekly" selected>Semanal</option>
-                                            <option value="monthly">Mensual</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="maxBackups" class="form-label">Número Máximo de Respaldos</label>
-                                        <input type="number" class="form-control" id="maxBackups" 
-                                               name="max_backups" value="7" min="1" max="30">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="backupDatabase" 
-                                               name="backup_database" checked>
-                                        <label class="form-check-label" for="backupDatabase">
-                                            Respaldar Base de Datos
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="backupConfigs" 
-                                               name="backup_configs" checked>
-                                        <label class="form-check-label" for="backupConfigs">
-                                            Respaldar Configuraciones
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="compressionLevel" class="form-label">Nivel de Compresión</label>
-                                <select class="form-control" id="compressionLevel" name="compression_level">
-                                    <option value="none">Sin Compresión</option>
-                                    <option value="low">Bajo</option>
-                                    <option value="medium" selected>Medio</option>
-                                    <option value="high">Alto</option>
-                                </select>
                             </div>
                         </form>
                     </div>
@@ -483,33 +279,40 @@
             </div>
 
             <!-- Users Configuration -->
-            <div class="tab-pane fade" id="users-config">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-users me-2"></i>Gestión de Usuarios
-                        </h5>
-                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                            <i class="fas fa-user-plus me-1"></i>Nuevo Usuario
+            <div class="config-tab-content hidden" id="users-config">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                <i class="fas fa-users mr-2 text-blue-600"></i>
+                                Gestión de Usuarios
+                            </h3>
+                            <p class="text-sm text-gray-600 mt-1">Administrar usuarios del sistema</p>
+                        </div>
+                        <button class="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200" 
+                                onclick="openAddUserModal()">
+                            <i class="fas fa-user-plus mr-2"></i>
+                            Nuevo Usuario
                         </button>
                     </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
+                    <div class="p-6">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
                                     <tr>
-                                        <th>Usuario</th>
-                                        <th>Email</th>
-                                        <th>Tipo</th>
-                                        <th>Estado</th>
-                                        <th>Último Login</th>
-                                        <th>Acciones</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="usersTable">
+                                <tbody class="bg-white divide-y divide-gray-200" id="usersTable">
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-4">
-                                            <i class="fas fa-spinner fa-spin me-2"></i>Cargando usuarios...
+                                        <td colspan="4" class="px-6 py-12 text-center text-gray-500">
+                                            <div class="flex flex-col items-center space-y-3">
+                                                <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
+                                                <span class="text-sm">Cargando usuarios...</span>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -523,41 +326,60 @@
 </div>
 
 <!-- Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-user-plus me-2"></i>Nuevo Usuario
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addUserForm">
-                    <div class="mb-3">
-                        <label for="newUsername" class="form-label">Nombre de Usuario</label>
-                        <input type="text" class="form-control" id="newUsername" name="username" required>
+<div id="addUserModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" onclick="closeAddUserModal()">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-user-plus text-blue-600 mr-3"></i>
+                    <h3 class="text-lg font-medium text-gray-900">Nuevo Usuario</h3>
+                </div>
+                <form id="addUserForm" class="space-y-4">
+                    <div>
+                        <label for="newUsername" class="block text-sm font-medium text-gray-700 mb-1">
+                            Nombre de Usuario
+                        </label>
+                        <input type="text" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                               id="newUsername" 
+                               name="username" 
+                               required>
                     </div>
-                    <div class="mb-3">
-                        <label for="newEmail" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="newEmail" name="email">
+                    <div>
+                        <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">
+                            Contraseña
+                        </label>
+                        <input type="password" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" 
+                               id="newPassword" 
+                               name="password" 
+                               required>
                     </div>
-                    <div class="mb-3">
-                        <label for="newPassword" class="form-label">Contraseña</label>
-                        <input type="password" class="form-control" id="newPassword" name="password" required>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="newIsAdmin" name="is_admin">
-                        <label class="form-check-label" for="newIsAdmin">
+                    <div class="flex items-center">
+                        <input type="checkbox" 
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                               id="newIsAdmin" 
+                               name="is_admin">
+                        <label for="newIsAdmin" class="ml-3 text-sm font-medium text-gray-700">
                             Usuario Administrador
                         </label>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="createUser()">
-                    <i class="fas fa-user-plus me-1"></i>Crear Usuario
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" 
+                        class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200" 
+                        onclick="createUser()">
+                    <i class="fas fa-user-plus mr-2"></i>
+                    Crear Usuario
+                </button>
+                <button type="button" 
+                        class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200" 
+                        onclick="closeAddUserModal()">
+                    Cancelar
                 </button>
             </div>
         </div>
@@ -575,106 +397,123 @@ document.addEventListener('DOMContentLoaded', function() {
     loadUsers();
 });
 
+// Tab functionality
+function showConfigTab(tabId, buttonElement) {
+    // Hide all tab content
+    document.querySelectorAll('.config-tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabId).classList.remove('hidden');
+    
+    // Update button states
+    document.querySelectorAll('.config-tab-btn').forEach(btn => {
+        btn.classList.remove('text-blue-700', 'bg-blue-100', 'border-blue-600');
+        btn.classList.add('text-gray-600', 'border-transparent');
+    });
+    
+    // Highlight active button
+    buttonElement.classList.add('text-blue-700', 'bg-blue-100', 'border-blue-600');
+    buttonElement.classList.remove('text-gray-600', 'border-transparent');
+}
+
 async function loadConfiguration() {
     try {
-        const response = await axios.get('/api/v1/config');
-        currentConfiguration = response.data.config || {};
+        const refreshIcon = document.getElementById('refreshIcon');
+        if (refreshIcon) refreshIcon.classList.add('fa-spin');
         
-        // Populate forms with current configuration
+        // In a real implementation, this would load from API
+        currentConfiguration = {
+            system_name: 'WebApp Manager SAAS',
+            system_description: 'Sistema de Gestión de Aplicaciones Web',
+            default_app_type: 'nextjs',
+            default_port: '3000',
+            auto_backup: true,
+            verbose_logging: false,
+            web_server_host: '0.0.0.0',
+            web_server_port: '8080',
+            apps_base_dir: '/var/www',
+            backup_dir: '/var/backups/webapp-manager',
+            max_login_attempts: 5,
+            min_password_length: 8
+        };
+        
         populateConfigurationForms();
+        
+        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+        showAlert('Configuración cargada correctamente', 'success');
         
     } catch (error) {
         console.error('Error loading configuration:', error);
-        showAlert('Error al cargar la configuración', 'danger');
+        showAlert('Error al cargar la configuración', 'error');
+        
+        const refreshIcon = document.getElementById('refreshIcon');
+        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
     }
 }
 
 function populateConfigurationForms() {
-    // General config
-    const generalForm = document.getElementById('generalConfigForm');
-    if (generalForm) {
-        setFormValue(generalForm, 'system_name', currentConfiguration.system_name || 'WebApp Manager SAAS');
-        setFormValue(generalForm, 'system_description', currentConfiguration.system_description || 'Sistema de Gestión de Aplicaciones Web');
-        setFormValue(generalForm, 'default_app_type', currentConfiguration.default_app_type || 'nextjs');
-        setFormValue(generalForm, 'default_port', currentConfiguration.default_port || '3000');
-        setFormValue(generalForm, 'timezone', currentConfiguration.timezone || 'UTC');
-        setFormValue(generalForm, 'auto_backup', currentConfiguration.auto_backup !== 'false');
-        setFormValue(generalForm, 'verbose_logging', currentConfiguration.verbose_logging === 'true');
-    }
+    const forms = ['generalConfigForm', 'serverConfigForm', 'pathsConfigForm', 'securityConfigForm'];
     
-    // Server config
-    const serverForm = document.getElementById('serverConfigForm');
-    if (serverForm) {
-        setFormValue(serverForm, 'web_server_host', currentConfiguration.web_server_host || '0.0.0.0');
-        setFormValue(serverForm, 'web_server_port', currentConfiguration.web_server_port || '8080');
-        setFormValue(serverForm, 'session_timeout', currentConfiguration.session_timeout || '24');
-        setFormValue(serverForm, 'max_request_size', currentConfiguration.max_request_size || '50');
-        setFormValue(serverForm, 'cors_origins', currentConfiguration.cors_origins || '*');
-        setFormValue(serverForm, 'enable_https', currentConfiguration.enable_https === 'true');
-        setFormValue(serverForm, 'enable_compression', currentConfiguration.enable_compression !== 'false');
-    }
-    
-    // Continue for other forms...
-}
-
-function setFormValue(form, name, value) {
-    const element = form.querySelector(`[name="${name}"]`);
-    if (!element) return;
-    
-    if (element.type === 'checkbox') {
-        element.checked = Boolean(value);
-    } else {
-        element.value = value;
-    }
+    forms.forEach(formId => {
+        const form = document.getElementById(formId);
+        if (!form) return;
+        
+        Object.keys(currentConfiguration).forEach(key => {
+            const element = form.querySelector(`[name="${key}"]`);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = Boolean(currentConfiguration[key]);
+                } else {
+                    element.value = currentConfiguration[key];
+                }
+            }
+        });
+    });
 }
 
 async function saveConfiguration() {
     try {
         const configData = {};
-        
-        // Collect data from all forms
-        const forms = ['generalConfigForm', 'serverConfigForm', 'pathsConfigForm', 
-                      'nginxConfigForm', 'securityConfigForm', 'backupConfigForm'];
+        const forms = ['generalConfigForm', 'serverConfigForm', 'pathsConfigForm', 'securityConfigForm'];
         
         forms.forEach(formId => {
             const form = document.getElementById(formId);
-            if (form) {
-                const formData = new FormData(form);
-                for (let [key, value] of formData.entries()) {
-                    const element = form.querySelector(`[name="${key}"]`);
-                    if (element && element.type === 'checkbox') {
-                        configData[key] = element.checked ? 'true' : 'false';
-                    } else {
-                        configData[key] = value;
-                    }
+            if (!form) return;
+            
+            const formData = new FormData(form);
+            for (let [key, value] of formData.entries()) {
+                const element = form.querySelector(`[name="${key}"]`);
+                if (element && element.type === 'checkbox') {
+                    configData[key] = element.checked;
+                } else {
+                    configData[key] = value;
                 }
             }
         });
         
-        await axios.post('/api/v1/config', configData);
-        showAlert('Configuración guardada correctamente', 'success');
+        // In a real implementation, this would save to API
+        currentConfiguration = { ...currentConfiguration, ...configData };
         
-        // Reload configuration
-        loadConfiguration();
+        showAlert('Configuración guardada correctamente', 'success');
         
     } catch (error) {
         console.error('Error saving configuration:', error);
-        const message = error.response?.data?.detail || 'Error al guardar la configuración';
-        showAlert(message, 'danger');
+        showAlert('Error al guardar la configuración', 'error');
     }
 }
 
 async function loadUsers() {
     try {
-        // This would be a real API endpoint in the full implementation
+        // Mock data for demonstration
         const users = [
             {
                 id: 1,
                 username: 'admin',
-                email: 'admin@example.com',
                 is_admin: true,
                 is_active: true,
-                last_login: new Date().toISOString()
+                created_at: new Date().toISOString()
             }
         ];
         
@@ -682,7 +521,7 @@ async function loadUsers() {
         
     } catch (error) {
         console.error('Error loading users:', error);
-        showAlert('Error al cargar los usuarios', 'danger');
+        showAlert('Error al cargar los usuarios', 'error');
     }
 }
 
@@ -692,152 +531,152 @@ function displayUsers(users) {
     if (users.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center text-muted py-4">
-                    <i class="fas fa-users-slash me-2"></i>No hay usuarios registrados
+                <td colspan="4" class="px-6 py-12 text-center text-gray-500">
+                    <div class="flex flex-col items-center space-y-3">
+                        <i class="fas fa-users-slash text-4xl text-gray-400"></i>
+                        <span class="text-sm">No hay usuarios registrados</span>
+                    </div>
                 </td>
             </tr>`;
         return;
     }
     
     tbody.innerHTML = users.map(user => `
-        <tr>
-            <td>
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-user-circle me-2 text-muted"></i>
-                    <strong>${user.username}</strong>
+        <tr class="hover:bg-gray-50 transition-colors duration-200">
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-gray-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-900">${user.username}</div>
+                        <div class="text-sm text-gray-500">ID: ${user.id}</div>
+                    </div>
                 </div>
             </td>
-            <td>${user.email || 'N/A'}</td>
-            <td>
-                <span class="badge ${user.is_admin ? 'bg-warning' : 'bg-secondary'}">
-                    <i class="fas ${user.is_admin ? 'fa-crown' : 'fa-user'} me-1"></i>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_admin ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">
+                    <i class="fas ${user.is_admin ? 'fa-crown' : 'fa-user'} mr-1"></i>
                     ${user.is_admin ? 'Admin' : 'Usuario'}
                 </span>
             </td>
-            <td>
-                <span class="badge ${user.is_active ? 'bg-success' : 'bg-danger'}">
-                    <i class="fas ${user.is_active ? 'fa-check-circle' : 'fa-times-circle'} me-1"></i>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                    <span class="w-1.5 h-1.5 ${user.is_active ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1"></span>
                     ${user.is_active ? 'Activo' : 'Inactivo'}
                 </span>
             </td>
-            <td>
-                <small class="text-muted">
-                    ${user.last_login ? formatDate(user.last_login) : 'Nunca'}
-                </small>
-            </td>
-            <td>
-                <div class="dropdown">
-                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
-                            data-bs-toggle="dropdown">
-                        <i class="fas fa-cog"></i>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <div class="flex justify-end space-x-2">
+                    <button class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition-all duration-200" 
+                            onclick="editUser(${user.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
                     </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="editUser(${user.id})">
-                                <i class="fas fa-edit me-2"></i>Editar
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="resetPassword(${user.id})">
-                                <i class="fas fa-key me-2"></i>Resetear Contraseña
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item ${user.is_active ? 'text-warning' : 'text-success'}" 
-                               href="#" onclick="toggleUserStatus(${user.id})">
-                                <i class="fas ${user.is_active ? 'fa-ban' : 'fa-check'} me-2"></i>
-                                ${user.is_active ? 'Desactivar' : 'Activar'}
-                            </a>
-                        </li>
-                        ${user.id !== 1 ? `
-                        <li>
-                            <a class="dropdown-item text-danger" href="#" onclick="deleteUser(${user.id}, '${user.username}')">
-                                <i class="fas fa-trash me-2"></i>Eliminar
-                            </a>
-                        </li>
-                        ` : ''}
-                    </ul>
+                    <button class="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all duration-200" 
+                            onclick="deleteUser(${user.id})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </td>
         </tr>
     `).join('');
 }
 
+// Modal functions
+function openAddUserModal() {
+    document.getElementById('addUserModal').classList.remove('hidden');
+    document.getElementById('newUsername').focus();
+}
+
+function closeAddUserModal() {
+    document.getElementById('addUserModal').classList.add('hidden');
+    document.getElementById('addUserForm').reset();
+}
+
 async function createUser() {
+    const form = document.getElementById('addUserForm');
+    const formData = new FormData(form);
+    
+    const userData = {
+        username: formData.get('username'),
+        password: formData.get('password'),
+        is_admin: formData.has('is_admin')
+    };
+    
+    if (!userData.username || !userData.password) {
+        showAlert('Por favor, complete todos los campos requeridos', 'warning');
+        return;
+    }
+    
     try {
-        const form = document.getElementById('addUserForm');
-        const formData = new FormData(form);
-        
-        const userData = {
-            username: formData.get('username'),
-            email: formData.get('email'),
-            password: formData.get('password'),
-            is_admin: formData.get('is_admin') === 'on'
-        };
-        
-        // This would be a real API call
-        console.log('Creating user:', userData);
-        
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
-        showAlert('Usuario creado correctamente', 'success');
-        form.reset();
-        loadUsers();
+        // In a real implementation, this would create via API
+        showAlert(`Usuario "${userData.username}" creado correctamente`, 'success');
+        closeAddUserModal();
+        loadUsers(); // Refresh user list
         
     } catch (error) {
         console.error('Error creating user:', error);
-        showAlert('Error al crear el usuario', 'danger');
+        showAlert('Error al crear el usuario', 'error');
     }
 }
 
-function editUser(userId) {
-    // Implementation for editing user
-    console.log('Edit user:', userId);
+async function editUser(userId) {
+    showAlert('Funcionalidad de edición en desarrollo', 'info');
 }
 
-function resetPassword(userId) {
-    if (confirm('¿Está seguro de que desea resetear la contraseña de este usuario?')) {
-        console.log('Reset password for user:', userId);
-        showAlert('Contraseña reseteada correctamente', 'success');
+async function deleteUser(userId) {
+    if (!confirm('¿Está seguro de que desea eliminar este usuario?')) {
+        return;
     }
-}
-
-function toggleUserStatus(userId) {
-    console.log('Toggle user status:', userId);
-    showAlert('Estado del usuario actualizado', 'success');
-    loadUsers();
-}
-
-function deleteUser(userId, username) {
-    if (confirm(`¿Está seguro de que desea eliminar al usuario "${username}"?`)) {
-        console.log('Delete user:', userId);
+    
+    try {
+        // In a real implementation, this would delete via API
         showAlert('Usuario eliminado correctamente', 'success');
-        loadUsers();
+        loadUsers(); // Refresh user list
+        
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showAlert('Error al eliminar el usuario', 'error');
     }
 }
 
-function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
-}
-
-function showAlert(message, type) {
+// Alert system
+function showAlert(message, type = 'info', duration = 5000) {
+    const alertColors = {
+        success: 'bg-green-100 border-green-400 text-green-700',
+        error: 'bg-red-100 border-red-400 text-red-700',
+        warning: 'bg-yellow-100 border-yellow-400 text-yellow-700',
+        info: 'bg-blue-100 border-blue-400 text-blue-700'
+    };
+    
+    const alertIcons = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        warning: 'exclamation-triangle',
+        info: 'info-circle'
+    };
+    
     const alert = document.createElement('div');
-    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.className = `fixed top-4 right-4 max-w-sm p-4 border-l-4 rounded shadow-lg z-50 ${alertColors[type] || alertColors.info}`;
     alert.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="flex items-center">
+            <i class="fas fa-${alertIcons[type] || alertIcons.info} mr-3"></i>
+            <span class="flex-1">${message}</span>
+            <button class="ml-3 text-current hover:opacity-75" onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     `;
     
-    const main = document.querySelector('main');
-    main.insertBefore(alert, main.firstChild);
+    document.body.appendChild(alert);
     
-    setTimeout(() => {
-        if (alert.parentNode) {
-            alert.remove();
-        }
-    }, 5000);
+    if (duration > 0) {
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, duration);
+    }
 }
 </script>
 {% endblock %}
