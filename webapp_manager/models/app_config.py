@@ -162,6 +162,7 @@ class SystemPaths:
     config_file: str = "/etc/webapp-manager/config.json"
     backup_dir: str = "/var/backups/webapp-manager"
     nginx_conf: str = "/etc/nginx/nginx.conf"
+    maintenance_dir: str = "/var/www/maintenance"
     
     def __post_init__(self):
         """Convertir strings a Path objects en core.manager"""
