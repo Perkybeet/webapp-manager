@@ -62,6 +62,7 @@ class WebAppManager:
         
         # Inicializar sistema
         self._ensure_directories()
+        self._create_maintenance_page()
         self._check_prerequisites()
         
         # Cargar configuración
@@ -77,6 +78,7 @@ class WebAppManager:
         self.paths.config_file = Path(self.paths.config_file)
         self.paths.backup_dir = Path(self.paths.backup_dir)
         self.paths.nginx_conf = Path(self.paths.nginx_conf)
+        self.paths.maintenance_dir = Path(self.paths.maintenance_dir)
     
     def _ensure_directories(self):
         """Crear directorios necesarios"""
@@ -85,18 +87,109 @@ class WebAppManager:
             self.paths.log_dir,
             self.paths.config_file.parent,
             self.paths.backup_dir,
+            self.paths.maintenance_dir,
             Path("/var/log/nginx"),
         ]
 
         for directory in dirs:
             try:
                 directory.mkdir(parents=True, exist_ok=True)
-                if directory in [self.paths.apps_dir, self.paths.log_dir]:
+                if directory in [self.paths.apps_dir, self.paths.log_dir, self.paths.maintenance_dir]:
                     self.cmd.run_sudo(f"chown -R www-data:www-data {directory}", check=False)
                 elif directory == Path("/var/log/nginx"):
                     self.cmd.run_sudo(f"chown -R www-data:adm {directory}", check=False)
             except Exception as e:
                 logger.error(f"Error creando directorio {directory}: {e}")
+    
+    def _create_maintenance_page(self):
+        """Crear página de mantenimiento si no existe"""
+        maintenance_file = self.paths.maintenance_dir / "index.html"
+        if not maintenance_file.exists():
+            html_content = """<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Actualización en Progreso</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            backdrop-filter: blur(10px);
+        }
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+        p {
+            color: #666;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🔄</div>
+        <h1>Actualización en Progreso</h1>
+        <div class="spinner"></div>
+        <p>Estamos actualizando la aplicación para mejorar tu experiencia. Esto tomará solo unos momentos.</p>
+        <p>Por favor, regresa en unos minutos.</p>
+        <div class="footer">
+            WebApp Manager - Mantenimiento Automático
+        </div>
+    </div>
+</body>
+</html>"""
+            try:
+                with open(maintenance_file, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                # Cambiar permisos
+                self.cmd.run_sudo(f"chown www-data:www-data {maintenance_file}", check=False)
+                self.cmd.run_sudo(f"chmod 644 {maintenance_file}", check=False)
+            except Exception as e:
+                logger.error(f"Error creando página de mantenimiento: {e}")
     
     def _check_prerequisites(self, force_verbose: bool = False):
         """Verificar prerrequisitos del sistema"""
@@ -657,7 +750,13 @@ class WebAppManager:
             app_config = self.config_manager.get_app(domain)
 
             if self.progress:
-                with self.progress.task(f"Actualizando {domain}", total=3) as task_id:
+                with self.progress.task(f"Actualizando {domain}", total=4) as task_id:
+                    # Activar modo mantenimiento
+                    self.progress.update(task_id, advance=1, description="Activando modo mantenimiento...")
+                    if not self.nginx_service.enable_maintenance_mode(app_config):
+                        self.progress.error("Error activando modo mantenimiento")
+                        return False
+
                     # Detener servicio
                     self.progress.update(task_id, advance=1, description="Deteniendo servicio...")
                     self.systemd_service.stop_service(domain)
@@ -665,28 +764,50 @@ class WebAppManager:
                     # Actualizar aplicación
                     self.progress.update(task_id, advance=1, description="Actualizando código y reconstruyendo...")
                     if not self.app_service.update_app(domain, app_config):
-                        # Intentar reiniciar servicio si falla
+                        # Intentar reiniciar servicio y desactivar mantenimiento si falla
                         self.systemd_service.start_service(domain)
+                        self.nginx_service.disable_maintenance_mode(app_config)
                         return False
 
                     # Reiniciar servicio
                     self.progress.update(task_id, advance=1, description="Reiniciando servicio...")
                     success = self.systemd_service.start_and_verify(domain, app_config.port)
+                    
+                    # Desactivar modo mantenimiento si el reinicio fue exitoso
+                    if success:
+                        self.nginx_service.disable_maintenance_mode(app_config)
+                    else:
+                        # Si el reinicio falla, mantener modo mantenimiento activo
+                        pass
             else:
+                # Activar modo mantenimiento
+                print(Colors.step(1, 4, "Activando modo mantenimiento"))
+                if not self.nginx_service.enable_maintenance_mode(app_config):
+                    print(Colors.error("Error activando modo mantenimiento"))
+                    return False
+
                 # Detener servicio
-                print(Colors.step(1, 3, "Deteniendo servicio"))
+                print(Colors.step(2, 4, "Deteniendo servicio"))
                 self.systemd_service.stop_service(domain)
 
                 # Actualizar aplicación
-                print(Colors.step(2, 3, "Actualizando código y reconstruyendo"))
+                print(Colors.step(3, 4, "Actualizando código y reconstruyendo"))
                 if not self.app_service.update_app(domain, app_config):
-                    # Intentar reiniciar servicio si falla
+                    # Intentar reiniciar servicio y desactivar mantenimiento si falla
                     self.systemd_service.start_service(domain)
+                    self.nginx_service.disable_maintenance_mode(app_config)
                     return False
 
                 # Reiniciar servicio
-                print(Colors.step(3, 3, "Reiniciando servicio"))
+                print(Colors.step(4, 4, "Reiniciando servicio"))
                 success = self.systemd_service.start_and_verify(domain, app_config.port)
+                
+                # Desactivar modo mantenimiento si el reinicio fue exitoso
+                if success:
+                    self.nginx_service.disable_maintenance_mode(app_config)
+                else:
+                    # Si el reinicio falla, mantener modo mantenimiento activo
+                    pass
 
             if success:
                 # Actualizar timestamp
