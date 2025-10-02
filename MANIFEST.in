@@ -1,0 +1,7 @@
+include README.md
+include LICENSE
+include requirements.txt
+include Makefile
+recursive-include apps/maintenance *.html
+recursive-include webapp_manager *.py
+prune **/__pycache__

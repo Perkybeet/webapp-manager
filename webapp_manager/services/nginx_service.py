@@ -102,6 +102,59 @@ class NginxService:
         except Exception:
             return False
     
+    def has_maintenance_config(self, domain: str) -> bool:
+        """Verificar si el dominio ya tiene configuración de mantenimiento"""
+        try:
+            config_path = self.nginx_sites / domain
+            if not config_path.exists():
+                return False
+                
+            with open(config_path, 'r') as f:
+                content = f.read()
+                return "error_page 502 503 504 /maintenance/error502.html" in content and "location ^~ /maintenance/" in content
+        except Exception:
+            return False
+    
+    def ensure_maintenance_directory(self) -> bool:
+        """Asegurar que el directorio de mantenimiento existe"""
+        try:
+            maintenance_dir = Path("/apps/maintenance")
+            maintenance_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copiar archivos de mantenimiento desde templates
+            template_dir = Path(__file__).parent.parent.parent / "apps" / "maintenance"
+            
+            if template_dir.exists():
+                for html_file in template_dir.glob("*.html"):
+                    target_file = maintenance_dir / html_file.name
+                    if not target_file.exists():
+                        shutil.copy2(html_file, target_file)
+                        print(Colors.info(f"Copiado archivo de mantenimiento: {html_file.name}"))
+            
+            return True
+        except Exception as e:
+            print(Colors.error(f"Error creando directorio de mantenimiento: {e}"))
+            return False
+    
+    def update_config_with_maintenance(self, app_config: AppConfig) -> bool:
+        """Actualizar configuración existente para incluir páginas de mantenimiento"""
+        try:
+            if self.has_maintenance_config(app_config.domain):
+                print(Colors.info(f"El dominio {app_config.domain} ya tiene configuración de mantenimiento"))
+                return True
+            
+            print(Colors.info(f"Actualizando configuración de {app_config.domain} con páginas de mantenimiento"))
+            
+            # Asegurar que el directorio de mantenimiento existe
+            self.ensure_maintenance_directory()
+            
+            # Recrear la configuración con mantenimiento
+            return self.create_config(app_config)
+            
+        except Exception as e:
+            print(Colors.error(f"Error actualizando configuración con mantenimiento: {e}"))
+            return False
+    
     def enable_maintenance_mode(self, app_config: AppConfig) -> bool:
         """Activar modo mantenimiento para una aplicación"""
         try:
@@ -203,6 +256,18 @@ server {{
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
 
+    # Error pages for maintenance mode
+    error_page 502 503 504 /maintenance/error502.html;
+    error_page 500 /maintenance/error502.html;
+    
+    # Maintenance pages location
+    location ^~ /maintenance/ {{
+        root /apps;
+        internal;
+        expires 30s;
+        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+    }}
+
     # Proxy ALL requests to Next.js server
     location / {{
         proxy_pass http://localhost:{app_config.port};
@@ -276,6 +341,18 @@ server {{
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Error pages for maintenance mode
+    error_page 502 503 504 /maintenance/error502.html;
+    error_page 500 /maintenance/error502.html;
+    
+    # Maintenance pages location
+    location ^~ /maintenance/ {{
+        root /apps;
+        internal;
+        expires 30s;
+        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+    }}
 
     # API endpoints - proxy a FastAPI/Uvicorn
     location / {{
@@ -352,6 +429,18 @@ server {{
     # Rate limiting
     limit_req zone=webapp_global burst=50 nodelay;
 
+    # Error pages for maintenance mode
+    error_page 502 503 504 /maintenance/error502.html;
+    error_page 500 /maintenance/error502.html;
+    
+    # Maintenance pages location
+    location ^~ /maintenance/ {{
+        root /apps;
+        internal;
+        expires 30s;
+        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+    }}
+
     location / {{
         proxy_pass http://localhost:{app_config.port};
         proxy_http_version 1.1;
@@ -399,6 +488,18 @@ server {{
     error_log /var/log/apps/{app_config.domain}-error.log;
 
     limit_req zone=webapp_global burst=50 nodelay;
+
+    # Error pages for maintenance mode (for static sites, mainly for updates)
+    error_page 502 503 504 /maintenance/error502.html;
+    error_page 500 /maintenance/error502.html;
+    
+    # Maintenance pages location
+    location ^~ /maintenance/ {{
+        root /apps;
+        internal;
+        expires 30s;
+        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+    }}
 
     location / {{
         try_files $uri $uri/ =404;

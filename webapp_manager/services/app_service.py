@@ -33,14 +33,16 @@ class AppService:
             if temp_dir.exists():
                 shutil.rmtree(temp_dir)
 
-            print(Colors.step(1, 6, "Preparando despliegue"))
+            # Paso 1: Preparación
+            if self.progress:
+                self.progress.console.print(f"[cyan]→[/cyan] Preparando despliegue")
+            elif self.verbose:
+                print(Colors.info("→ Preparando despliegue"))
 
             # Backup si existe
             if app_dir.exists():
                 if self.verbose:
-                    print(Colors.info("💾 Creando backup de aplicación existente..."))
-                else:
-                    print(Colors.info("Creando backup de aplicación existente..."))
+                    print(Colors.info("  Creando backup de aplicación existente..."))
                     
                 backup_dir = self.apps_dir / f"{app_config.domain}_backup"
                 if backup_dir.exists():
@@ -48,20 +50,22 @@ class AppService:
                 shutil.copytree(app_dir, backup_dir)
                 
                 if self.verbose:
-                    print(Colors.success(f"✅ Backup creado en: {backup_dir}"))
+                    print(Colors.success(f"  Backup creado en: {backup_dir}"))
 
-            if self.verbose:
-                print(Colors.step(2, 6, "📥 Obteniendo código fuente"))
-            else:
-                print(Colors.step(2, 6, "Obteniendo código fuente"))
+            # Paso 2: Obtener código
+            if self.progress:
+                self.progress.console.print(f"[cyan]→[/cyan] Obteniendo código fuente")
+            elif self.verbose:
+                print(Colors.info("→ Obteniendo código fuente"))
 
             if not self._get_source_code(app_config.source, app_config.branch, temp_dir):
                 return False
 
-            if self.verbose:
-                print(Colors.step(3, 6, "🔍 Validando estructura con deployer modular"))
-            else:
-                print(Colors.step(3, 6, "Validando estructura con deployer modular"))
+            # Paso 3: Validar estructura
+            if self.progress:
+                self.progress.console.print(f"[cyan]→[/cyan] Validando estructura")
+            elif self.verbose:
+                print(Colors.info("→ Validando estructura"))
             
             # Crear deployer específico
             deployer = DeployerFactory.create_deployer(app_config.app_type, str(self.apps_dir), self.cmd)
@@ -72,19 +76,21 @@ class AppService:
                     shutil.rmtree(temp_dir)
                 return False
 
-            if self.verbose:
-                print(Colors.step(4, 6, "⚙️  Verificando requerimientos del sistema"))
-            else:
-                print(Colors.step(4, 6, "Verificando requerimientos del sistema"))
+            # Paso 4: Verificar requerimientos
+            if self.progress:
+                self.progress.console.print(f"[cyan]→[/cyan] Verificando requerimientos")
+            elif self.verbose:
+                print(Colors.info("→ Verificando requerimientos"))
                 
             if not deployer.check_requirements():
                 print(Colors.error("Requerimientos del sistema no cumplidos"))
                 return False
 
-            if self.verbose:
-                print(Colors.step(5, 6, "🔨 Instalando dependencias y construyendo"))
-            else:
-                print(Colors.step(5, 6, "Instalando dependencias y construyendo"))
+            # Paso 5: Instalar y construir
+            if self.progress:
+                self.progress.console.print(f"[cyan]→[/cyan] Instalando dependencias y construyendo")
+            elif self.verbose:
+                print(Colors.info("→ Instalando dependencias y construyendo"))
             
             # Instalar dependencias
             if not deployer.install_dependencies(temp_dir, app_config):
@@ -103,12 +109,14 @@ class AppService:
             # Manejar archivo .env
             if hasattr(deployer, 'handle_environment_file'):
                 if not deployer.handle_environment_file(temp_dir, app_config):
-                    print(Colors.warning("Error configurando archivo .env"))
+                    if self.verbose:
+                        print(Colors.warning("Error configurando archivo .env"))
 
-            if self.verbose:
-                print(Colors.step(6, 6, "🎯 Finalizando despliegue"))
-            else:
-                print(Colors.step(6, 6, "Finalizando despliegue"))
+            # Paso 6: Finalizar
+            if self.progress:
+                self.progress.console.print(f"[cyan]→[/cyan] Finalizando despliegue")
+            elif self.verbose:
+                print(Colors.info("→ Finalizando despliegue"))
                 
             if not self._finalize_deployment(app_dir, temp_dir):
                 return False
@@ -118,19 +126,18 @@ class AppService:
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
                 if self.verbose:
-                    print(Colors.info("🗑️  Backup temporal eliminado"))
+                    print(Colors.info("  Backup temporal eliminado"))
 
             if self.verbose:
-                print(Colors.success(f"🎉 Aplicación desplegada exitosamente en {app_dir}"))
-            else:
-                print(Colors.success(f"Aplicación desplegada en {app_dir}"))
+                print(Colors.success(f"✓ Aplicación desplegada exitosamente en {app_dir}"))
+            
             return True
 
         except Exception as e:
             print(Colors.error(f"Error en despliegue: {e}"))
             if self.verbose:
                 import traceback
-                print(Colors.error(f"🔍 Detalles del error:\n{traceback.format_exc()}"))
+                print(Colors.error(f"Detalles del error:\n{traceback.format_exc()}"))
             self._cleanup_failed_deployment(app_config.domain, temp_dir)
             return False
 
@@ -141,126 +148,91 @@ class AppService:
             backup_dir = self.apps_dir / f"{domain}_backup"
 
             if not app_config.source.startswith(("http", "git@")):
+                error_msg = "Solo se pueden actualizar aplicaciones desde repositorios git"
                 if self.progress:
-                    self.progress.error("Solo se pueden actualizar aplicaciones desde repositorios git")
+                    self.progress.error(error_msg)
                 else:
-                    print(Colors.error("Solo se pueden actualizar aplicaciones desde repositorios git"))
+                    print(Colors.error(error_msg))
                 return False
 
             if not app_dir.exists():
+                error_msg = f"Directorio de aplicación no existe: {app_dir}"
                 if self.progress:
-                    self.progress.error(f"Directorio de aplicación no existe: {app_dir}")
+                    self.progress.error(error_msg)
                 else:
-                    print(Colors.error(f"Directorio de aplicación no existe: {app_dir}"))
+                    print(Colors.error(error_msg))
                 return False
 
-            if self.progress:
-                with self.progress.task("Actualizando código y reconstruyendo", total=6) as task_id:
-                    # Paso 1: Crear backup
-                    self.progress.update(task_id, advance=1, description="Creando backup")
-                    if backup_dir.exists():
-                        shutil.rmtree(backup_dir)
-                    shutil.copytree(app_dir, backup_dir)
-                    self.progress.log(f"Backup creado en {backup_dir}")
+            # Paso 1: Crear backup
+            if self.verbose:
+                print(Colors.info("  Creando backup"))
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            shutil.copytree(app_dir, backup_dir)
+            if self.verbose:
+                print(Colors.success(f"  Backup creado: {backup_dir}"))
 
-                    # Paso 2: Configurar permisos para Git
-                    self.progress.update(task_id, advance=1, description="Configurando permisos para Git")
-                    self.cmd.run_sudo(f"chown -R root:root {app_dir}")
-                    self._configure_git_safe_directory(app_dir)
-                    
-                    try:
-                        git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
-                        self.progress.log("Verificación de Git completada")
-                    except Exception as e:
-                        self.progress.warning(f"Advertencia en verificación Git: {e}")
+            # Paso 2: Configurar permisos para Git
+            if self.verbose:
+                print(Colors.info("  Configurando permisos"))
+            self.cmd.run_sudo(f"chown -R root:root {app_dir}")
+            self._configure_git_safe_directory(app_dir)
+            
+            try:
+                git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
+            except Exception as e:
+                if self.verbose:
+                    print(Colors.warning(f"  Advertencia Git: {e}"))
 
-                    # Paso 3: Actualizar código
-                    self.progress.update(task_id, advance=1, description="Actualizando código")
-                    update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
-                    
-                    if not update_success:
-                        self.progress.error("Error actualizando código - ninguna rama válida encontrada")
-                        self._restore_from_backup(domain, app_dir, backup_dir)
-                        return False
-                    
-                    if used_branch != app_config.branch:
-                        self.progress.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'")
-                    
-                    self.progress.log("Código actualizado exitosamente")
+            # Paso 3: Actualizar código
+            if self.verbose:
+                print(Colors.info("  Actualizando código desde repositorio"))
+            update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
+            
+            if not update_success:
+                print(Colors.error("Error actualizando código - ninguna rama válida encontrada"))
+                self._restore_from_backup(domain, app_dir, backup_dir)
+                return False
+            
+            if used_branch != app_config.branch:
+                print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
 
-                    # Paso 4: Reconstruir aplicación
-                    self.progress.update(task_id, advance=1, description="Reconstruyendo aplicación")
-                    self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
-                    
-                    if not self._rebuild_application(app_dir, app_config):
-                        self.progress.error("Error reconstruyendo aplicación")
-                        self._restore_from_backup(domain, app_dir, backup_dir)
-                        return False
+            # Paso 4: Reconstruir aplicación
+            if self.verbose:
+                print(Colors.info("  Reconstruyendo aplicación"))
+            self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
+            
+            if not self._rebuild_application(app_dir, app_config):
+                print(Colors.error("Error reconstruyendo aplicación"))
+                self._restore_from_backup(domain, app_dir, backup_dir)
+                return False
 
-                    # Paso 5: Configurar permisos finales
-                    self.progress.update(task_id, advance=1, description="Configurando permisos finales")
-                    self._set_permissions(app_dir)
+            # Paso 5: Configurar permisos finales
+            if self.verbose:
+                print(Colors.info("  Configurando permisos finales"))
+            self._set_permissions(app_dir)
 
-                    # Paso 6: Limpiar backup
-                    self.progress.update(task_id, advance=1, description="Limpiando backup")
-                    if backup_dir.exists():
-                        shutil.rmtree(backup_dir)
-            else:
-                # Modo verbose: usar el sistema de pasos original
-                print(Colors.step(1, 6, "Creando backup"))
-                if backup_dir.exists():
-                    shutil.rmtree(backup_dir)
-                shutil.copytree(app_dir, backup_dir)
-                print(Colors.success(f"Backup creado en {backup_dir}"))
+            # Paso 6: Limpiar backup
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+                if self.verbose:
+                    print(Colors.info("  Backup temporal eliminado"))
 
-                print(Colors.step(2, 6, "Configurando permisos para Git"))
-                self.cmd.run_sudo(f"chown -R root:root {app_dir}")
-                self._configure_git_safe_directory(app_dir)
-                
-                try:
-                    git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
-                    print(Colors.info("Verificación de Git completada"))
-                except Exception as e:
-                    print(Colors.warning(f"Advertencia en verificación Git: {e}"))
-
-                print(Colors.step(3, 6, "Actualizando código"))
-                update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
-                
-                if not update_success:
-                    print(Colors.error("Error actualizando código - ninguna rama válida encontrada"))
-                    self._restore_from_backup(domain, app_dir, backup_dir)
-                    return False
-                
-                if used_branch != app_config.branch:
-                    print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
-                
-                print(Colors.success("Código actualizado exitosamente"))
-
-                print(Colors.step(4, 6, "Reconstruyendo aplicación"))
-                self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
-                
-                if not self._rebuild_application(app_dir, app_config):
-                    print(Colors.error("Error reconstruyendo aplicación"))
-                    self._restore_from_backup(domain, app_dir, backup_dir)
-                    return False
-
-                print(Colors.step(5, 6, "Configurando permisos finales"))
-                self._set_permissions(app_dir)
-
-                print(Colors.step(6, 6, "Limpiando backup"))
-                if backup_dir.exists():
-                    shutil.rmtree(backup_dir)
-
-                print(Colors.success(f"Aplicación {domain} actualizada exitosamente"))
+            if self.verbose:
+                print(Colors.success("  Actualización completada"))
             
             return True
 
         except Exception as e:
-            if self.progress:
-                self.progress.error(f"Error actualizando aplicación: {e}")
-            else:
-                print(Colors.error(f"Error actualizando aplicación: {e}"))
-            self._restore_from_backup(domain, app_dir, backup_dir)
+            print(Colors.error(f"Error durante actualización: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
+            
+            # Intentar restaurar desde backup
+            if backup_dir.exists():
+                self._restore_from_backup(domain, app_dir, backup_dir)
+            
             return False
 
     def remove_app(self, domain: str) -> bool:

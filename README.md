@@ -168,6 +168,73 @@ webapp-manager repair --domain app.ejemplo.com
 webapp-manager ssl --domain app.ejemplo.com --email admin@ejemplo.com
 ```
 
+## 🚧 Páginas de Mantenimiento
+
+WebApp Manager incluye un sistema automático de páginas de mantenimiento profesionales que se muestran cuando las aplicaciones están siendo actualizadas o experimentan problemas.
+
+### Características
+
+- **📱 Páginas Modernas**: Diseño profesional y responsivo sin emojis
+- **🔄 Auto-actualización**: Las páginas se recargan automáticamente cada 30 segundos
+- **🎨 Diferentes Tipos**: 
+  - `updating.html` - Para actualizaciones en progreso
+  - `error502.html` - Para errores de servidor (502/503/504)
+  - `maintenance.html` - Para mantenimiento programado
+- **⚙️ Configuración Automática**: Se aplica automáticamente en nuevas instalaciones
+- **🔧 Redirección Inteligente**: nginx redirige automáticamente en caso de errores
+
+### Uso
+
+```bash
+# Aplicar páginas de mantenimiento a aplicaciones existentes
+webapp-manager apply-maintenance
+
+# Las páginas se crean automáticamente al instalar nuevas aplicaciones
+webapp-manager add --domain miapp.com --source /ruta/app --port 3000
+```
+
+### Ubicación de Archivos
+
+```
+/apps/maintenance/
+├── updating.html      # Página de actualización
+├── error502.html      # Página de error de servidor
+└── maintenance.html   # Página de mantenimiento programado
+```
+
+### Configuración de nginx
+
+El sistema configura automáticamente nginx para:
+
+```nginx
+# Redirección automática en errores
+error_page 502 503 504 /maintenance/error502.html;
+error_page 500 /maintenance/error502.html;
+
+# Ubicación de páginas de mantenimiento
+location ^~ /maintenance/ {
+    root /apps;
+    internal;
+    expires 30s;
+    add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+}
+```
+
+### Para Aplicaciones Existentes
+
+Si tienes aplicaciones instaladas antes de esta actualización, puedes aplicar las páginas de mantenimiento ejecutando:
+
+```bash
+webapp-manager apply-maintenance
+```
+
+Este comando:
+1. ✅ Verifica qué aplicaciones necesitan actualización
+2. 🔧 Aplica la configuración de mantenimiento a las que no la tienen
+3. 📁 Crea los archivos HTML necesarios
+4. 🔄 Recarga la configuración de nginx
+5. 📊 Muestra un resumen de la operación
+
 ## Estructura del proyecto
 
 ```

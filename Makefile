@@ -234,7 +234,16 @@ install-complete: fix-line-endings install-global
 	@echo "$(BLUE)Verifying installation...$(NC)"
 	webapp-manager --help || echo "$(YELLOW)Installation completed but command may need path adjustment$(NC)"
 	@echo "$(GREEN)Installation completed successfully!$(NC)"
-	@echo "$(YELLOW)Usage: webapp-manager --help$(NC)"
+	@echo ""
+	@echo "$(YELLOW)⚠️  IMPORTANTE: Ejecuta el comando de configuración inicial:$(NC)"
+	@echo "$(CYAN)   sudo webapp-manager setup$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Este comando configurará:$(NC)"
+	@echo "  • Páginas de mantenimiento en /apps/maintenance/"
+	@echo "  • Verificación de conflictos con nginx default"
+	@echo "  • Directorios y permisos necesarios"
+	@echo ""
+	@echo "$(YELLOW)Uso: webapp-manager --help$(NC)"
 
 # Clean installation without pip (for externally-managed environments)
 .PHONY: install-clean
@@ -281,6 +290,7 @@ install-global: check-root
 	@echo "$(BLUE)Creating installation directory...$(NC)"
 	sudo mkdir -p /opt/webapp-manager
 	sudo cp -r webapp_manager/ /opt/webapp-manager/
+	sudo cp -r apps/ /opt/webapp-manager/ 2>/dev/null || echo "$(YELLOW)Warning: apps directory not found$(NC)"
 	sudo cp webapp-manager.py /opt/webapp-manager/
 	sudo cp setup.py /opt/webapp-manager/ 2>/dev/null || true
 	sudo cp requirements.txt /opt/webapp-manager/ 2>/dev/null || true

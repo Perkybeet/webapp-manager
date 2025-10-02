@@ -183,6 +183,7 @@ class WebAppManager:
 </body>
 </html>"""
             try:
+                # Crear el archivo HTML legacy para compatibilidad
                 with open(maintenance_file, 'w', encoding='utf-8') as f:
                     f.write(html_content)
                 # Cambiar permisos
@@ -190,6 +191,30 @@ class WebAppManager:
                 self.cmd.run_sudo(f"chmod 644 {maintenance_file}", check=False)
             except Exception as e:
                 logger.error(f"Error creando página de mantenimiento: {e}")
+        
+        # Asegurar que las nuevas páginas de mantenimiento estén disponibles
+        try:
+            # Crear directorio /apps/maintenance si no existe
+            apps_maintenance_dir = Path("/apps/maintenance")
+            apps_maintenance_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copiar archivos desde el directorio templates del proyecto
+            template_dir = Path(__file__).parent.parent.parent / "apps" / "maintenance"
+            
+            if template_dir.exists():
+                for html_file in template_dir.glob("*.html"):
+                    target_file = apps_maintenance_dir / html_file.name
+                    if not target_file.exists():
+                        shutil.copy2(html_file, target_file)
+                        self.cmd.run_sudo(f"chown www-data:www-data {target_file}", check=False)
+                        self.cmd.run_sudo(f"chmod 644 {target_file}", check=False)
+                        if self.verbose:
+                            print(Colors.info(f"Copiado archivo de mantenimiento: {html_file.name}"))
+                            
+        except Exception as e:
+            logger.error(f"Error configurando páginas de mantenimiento: {e}")
+            if self.verbose:
+                print(Colors.error(f"Error configurando páginas de mantenimiento: {e}"))
     
     def _check_prerequisites(self, force_verbose: bool = False):
         """Verificar prerrequisitos del sistema"""
@@ -413,7 +438,7 @@ class WebAppManager:
         """Agregar aplicación con progress manager"""
         try:
             # Paso 1: Validaciones
-            self.progress.update(task_id, advance=1, description="Validando parámetros...")
+            self.progress.update(task_id, advance=1, description="Validando parámetros")
             
             if not Validators.validate_domain(domain):
                 self.progress.error(f"Dominio inválido: {domain}")
@@ -449,48 +474,49 @@ class WebAppManager:
             )
 
             # Paso 2: Desplegar aplicación
-            self.progress.update(task_id, advance=1, description="Desplegando aplicación...")
+            self.progress.update(task_id, advance=1, description="Desplegando aplicación")
             if not self.app_service.deploy_app(app_config):
                 return False
 
             # Paso 3: Configurar nginx
-            self.progress.update(task_id, advance=1, description="Configurando nginx...")
+            self.progress.update(task_id, advance=1, description="Configurando nginx")
+            self.nginx_service.ensure_maintenance_directory()
             if not self.nginx_service.create_config(app_config):
                 self.progress.warning("Problemas con nginx, pero continuando...")
 
             # Paso 4: Crear servicio systemd
-            self.progress.update(task_id, advance=1, description="Creando servicio systemd...")
+            self.progress.update(task_id, advance=1, description="Creando servicio systemd")
             if not self.systemd_service.create_service(app_config, env_vars):
                 return False
 
             # Paso 5: Iniciar servicio
-            self.progress.update(task_id, advance=1, description="Iniciando servicio...")
+            self.progress.update(task_id, advance=1, description="Iniciando servicio")
             if not self.systemd_service.start_and_verify(domain, port):
                 return False
 
             # Paso 6: Recargar nginx
-            self.progress.update(task_id, advance=1, description="Recargando nginx...")
+            self.progress.update(task_id, advance=1, description="Recargando nginx")
             self.nginx_service.reload()
 
             # Paso 7: Verificar conectividad
-            self.progress.update(task_id, advance=1, description="Verificando conectividad...")
+            self.progress.update(task_id, advance=1, description="Verificando conectividad")
             self.app_service.test_connectivity(domain, port)
 
             # Paso 8: SSL
             if ssl:
-                self.progress.update(task_id, advance=1, description="Configurando SSL...")
+                self.progress.update(task_id, advance=1, description="Configurando SSL")
                 ssl_success = self.setup_ssl(domain)
                 if not ssl_success:
                     self.progress.warning("SSL no configurado, aplicación disponible solo en HTTP")
                     app_config.ssl = False
             else:
-                self.progress.update(task_id, advance=1, description="Finalizando...")
+                self.progress.update(task_id, advance=1, description="Finalizando")
 
             # Marcar como activa y guardar configuración
             app_config.set_active()
             self.config_manager.add_app(app_config)
 
-            self.progress.success(f"Aplicación {domain} agregada exitosamente!")
+            self.progress.success(f"Aplicación {domain} agregada exitosamente")
             return True
 
         except Exception as e:
@@ -512,7 +538,8 @@ class WebAppManager:
     ) -> bool:
         """Agregar aplicación modo legacy (compatibilidad)"""
         # Validaciones
-        print(Colors.step(1, 8, "Validando parámetros"))
+        if self.verbose:
+            print(Colors.info("→ Validando parámetros"))
         
         if not Validators.validate_domain(domain):
             print(Colors.error(f"Dominio inválido: {domain}"))
@@ -534,12 +561,13 @@ class WebAppManager:
             print(Colors.error(f"Tipo de aplicación inválido: {app_type}"))
             return False
 
-        # Mostrar información
-        print(Colors.info(f"Dominio: {domain}"))
-        print(Colors.info(f"Puerto: {port}"))
-        print(Colors.info(f"Tipo: {app_type}"))
-        print(Colors.info(f"Fuente: {source_path}"))
-        print(Colors.info(f"SSL: {'Sí' if ssl else 'No'}"))
+        # Mostrar información solo en verbose
+        if self.verbose:
+            print(Colors.info(f"Dominio: {domain}"))
+            print(Colors.info(f"Puerto: {port}"))
+            print(Colors.info(f"Tipo: {app_type}"))
+            print(Colors.info(f"Fuente: {source_path}"))
+            print(Colors.info(f"SSL: {'Sí' if ssl else 'No'}"))
 
         try:
             # Crear configuración de aplicación
@@ -556,56 +584,63 @@ class WebAppManager:
             )
 
             # Desplegar aplicación
-            print(Colors.step(2, 8, "Desplegando aplicación"))
+            if self.verbose:
+                print(Colors.info("→ Desplegando aplicación"))
             if not self.app_service.deploy_app(app_config):
                 return False
 
             # Configurar nginx
-            print(Colors.step(3, 8, "Configurando nginx"))
+            if self.verbose:
+                print(Colors.info("→ Configurando nginx"))
+            # Asegurar que el directorio de mantenimiento existe
+            self.nginx_service.ensure_maintenance_directory()
             if not self.nginx_service.create_config(app_config):
                 print(Colors.warning("Problemas con nginx, pero continuando..."))
 
             # Crear servicio systemd
-            print(Colors.step(4, 8, "Creando servicio systemd"))
+            if self.verbose:
+                print(Colors.info("→ Creando servicio systemd"))
             if not self.systemd_service.create_service(app_config, env_vars):
                 return False
 
             # Iniciar servicio
-            print(Colors.step(5, 8, "Iniciando servicio"))
+            if self.verbose:
+                print(Colors.info("→ Iniciando servicio"))
             if not self.systemd_service.start_and_verify(domain, port):
                 return False
 
             # Recargar nginx
-            print(Colors.step(6, 8, "Recargando nginx"))
+            if self.verbose:
+                print(Colors.info("→ Recargando nginx"))
             self.nginx_service.reload()
 
             # Verificar conectividad
-            print(Colors.step(7, 8, "Verificando conectividad"))
+            if self.verbose:
+                print(Colors.info("→ Verificando conectividad"))
             self.app_service.test_connectivity(domain, port)
 
             # Configurar SSL si es necesario
             if ssl:
-                print(Colors.step(8, 8, "Configurando SSL"))
+                if self.verbose:
+                    print(Colors.info("→ Configurando SSL"))
                 ssl_success = self.setup_ssl(domain)
                 if not ssl_success:
                     print(Colors.warning("SSL no configurado, aplicación disponible solo en HTTP"))
                     app_config.ssl = False
-            else:
-                print(Colors.step(8, 8, "Omitiendo SSL"))
 
             # Marcar como activa y guardar configuración
             app_config.set_active()
             self.config_manager.add_app(app_config)
 
             # Mostrar resumen
-            print(Colors.header("Despliegue Completado"))
-            print(Colors.success(f"Aplicación {domain} agregada exitosamente!"))
-            print(Colors.info(f"🌐 HTTP: http://{domain}"))
-            if app_config.ssl:
-                print(Colors.info(f"🔒 HTTPS: https://{domain}"))
-            print(Colors.info(f"📊 Puerto interno: {port}"))
-            print(Colors.info(f"📁 Directorio: {self.paths.apps_dir}/{domain}"))
-            print(Colors.info(f"🔧 Servicio: {domain}.service"))
+            print(Colors.success(f"\n✓ Aplicación {domain} agregada exitosamente"))
+            if self.verbose:
+                print(Colors.info(f"  HTTP: http://{domain}"))
+                if app_config.ssl:
+                    print(Colors.info(f"  HTTPS: https://{domain}"))
+                print(Colors.info(f"  Puerto interno: {port}"))
+                print(Colors.info(f"  Directorio: {self.paths.apps_dir}/{domain}"))
+                print(Colors.info(f"  Servicio: {domain}.service"))
 
             return True
 
@@ -697,10 +732,11 @@ class WebAppManager:
             print(Colors.header(f"Reiniciando Aplicación: {domain}"))
 
         if not self.config_manager.app_exists(domain):
+            error_msg = f"Aplicación {domain} no encontrada"
             if self.progress:
-                self.progress.error(f"Aplicación {domain} no encontrada")
+                self.progress.error(error_msg)
             else:
-                print(Colors.error(f"Aplicación {domain} no encontrada"))
+                print(Colors.error(error_msg))
             return False
 
         try:
@@ -708,42 +744,46 @@ class WebAppManager:
 
             if self.progress:
                 with self.progress.task(f"Reiniciando {domain}", total=2) as task_id:
-                    self.progress.update(task_id, advance=1, description="Reiniciando servicio...")
+                    self.progress.update(task_id, advance=1, description="Reiniciando servicio")
                     if not self.systemd_service.restart_service(domain):
                         self.progress.error("Error reiniciando servicio")
                         return False
 
-                    self.progress.update(task_id, advance=1, description="Verificando estado...")
+                    self.progress.update(task_id, advance=1, description="Verificando estado")
                     return self.systemd_service.start_and_verify(domain, app_config.port)
             else:
-                print(Colors.step(1, 2, "Reiniciando servicio"))
+                if self.verbose:
+                    print(Colors.info("→ Reiniciando servicio"))
                 if not self.systemd_service.restart_service(domain):
                     print(Colors.error("Error reiniciando servicio"))
                     return False
 
-                print(Colors.step(2, 2, "Verificando estado"))
+                if self.verbose:
+                    print(Colors.info("→ Verificando estado"))
                 return self.systemd_service.start_and_verify(domain, app_config.port)
 
         except Exception as e:
+            error_msg = f"Error reiniciando {domain}: {e}"
             if self.progress:
-                self.progress.error(f"Error reiniciando {domain}: {e}")
+                self.progress.error(error_msg)
             else:
-                print(Colors.error(f"Error reiniciando {domain}: {e}"))
+                print(Colors.error(error_msg))
             return False
     
     def update_app(self, domain: str) -> bool:
         """Actualizar aplicación"""
-        # Verificar prerrequisitos visiblemente para comandos de despliegue
+        # Verificar prerrequisitos
         self.check_prerequisites()
         
         if self.verbose:
             print(Colors.header(f"Actualizando Aplicación: {domain}"))
 
         if not self.config_manager.app_exists(domain):
+            error_msg = f"Aplicación {domain} no encontrada"
             if self.progress:
-                self.progress.error(f"Aplicación {domain} no encontrada")
+                self.progress.error(error_msg)
             else:
-                print(Colors.error(f"Aplicación {domain} no encontrada"))
+                print(Colors.error(error_msg))
             return False
 
         try:
@@ -751,86 +791,87 @@ class WebAppManager:
 
             if self.progress:
                 with self.progress.task(f"Actualizando {domain}", total=4) as task_id:
+                    # Verificar y aplicar configuración de mantenimiento
+                    self.progress.update(task_id, advance=0.5, description="Verificando configuración")
+                    self.nginx_service.update_config_with_maintenance(app_config)
+                    
                     # Activar modo mantenimiento
-                    self.progress.update(task_id, advance=1, description="Activando modo mantenimiento...")
+                    self.progress.update(task_id, advance=0.5, description="Activando mantenimiento")
                     if not self.nginx_service.enable_maintenance_mode(app_config):
                         self.progress.error("Error activando modo mantenimiento")
                         return False
 
                     # Detener servicio
-                    self.progress.update(task_id, advance=1, description="Deteniendo servicio...")
+                    self.progress.update(task_id, advance=1, description="Deteniendo servicio")
                     self.systemd_service.stop_service(domain)
 
                     # Actualizar aplicación
-                    self.progress.update(task_id, advance=1, description="Actualizando código y reconstruyendo...")
+                    self.progress.update(task_id, advance=1, description="Actualizando código")
                     if not self.app_service.update_app(domain, app_config):
-                        # Intentar reiniciar servicio y desactivar mantenimiento si falla
                         self.systemd_service.start_service(domain)
                         self.nginx_service.disable_maintenance_mode(app_config)
                         return False
 
                     # Reiniciar servicio
-                    self.progress.update(task_id, advance=1, description="Reiniciando servicio...")
+                    self.progress.update(task_id, advance=1, description="Reiniciando servicio")
                     success = self.systemd_service.start_and_verify(domain, app_config.port)
                     
-                    # Desactivar modo mantenimiento si el reinicio fue exitoso
+                    # Desactivar modo mantenimiento si fue exitoso
                     if success:
                         self.nginx_service.disable_maintenance_mode(app_config)
-                    else:
-                        # Si el reinicio falla, mantener modo mantenimiento activo
-                        pass
             else:
-                # Activar modo mantenimiento
-                print(Colors.step(1, 4, "Activando modo mantenimiento"))
+                # Modo verbose/legacy
+                if self.verbose:
+                    print(Colors.info("→ Verificando configuración de mantenimiento"))
+                self.nginx_service.update_config_with_maintenance(app_config)
+                
+                if self.verbose:
+                    print(Colors.info("→ Activando modo mantenimiento"))
                 if not self.nginx_service.enable_maintenance_mode(app_config):
                     print(Colors.error("Error activando modo mantenimiento"))
                     return False
 
-                # Detener servicio
-                print(Colors.step(2, 4, "Deteniendo servicio"))
+                if self.verbose:
+                    print(Colors.info("→ Deteniendo servicio"))
                 self.systemd_service.stop_service(domain)
 
-                # Actualizar aplicación
-                print(Colors.step(3, 4, "Actualizando código y reconstruyendo"))
+                if self.verbose:
+                    print(Colors.info("→ Actualizando código y reconstruyendo"))
                 if not self.app_service.update_app(domain, app_config):
-                    # Intentar reiniciar servicio y desactivar mantenimiento si falla
                     self.systemd_service.start_service(domain)
                     self.nginx_service.disable_maintenance_mode(app_config)
                     return False
 
-                # Reiniciar servicio
-                print(Colors.step(4, 4, "Reiniciando servicio"))
+                if self.verbose:
+                    print(Colors.info("→ Reiniciando servicio"))
                 success = self.systemd_service.start_and_verify(domain, app_config.port)
                 
-                # Desactivar modo mantenimiento si el reinicio fue exitoso
                 if success:
                     self.nginx_service.disable_maintenance_mode(app_config)
-                else:
-                    # Si el reinicio falla, mantener modo mantenimiento activo
-                    pass
 
             if success:
-                # Actualizar timestamp
                 app_config.update_timestamp()
                 self.config_manager.update_app(domain, app_config)
                 
                 if self.progress:
                     self.progress.success(f"Aplicación {domain} actualizada exitosamente")
                 else:
-                    print(Colors.success(f"Aplicación {domain} actualizada exitosamente"))
+                    print(Colors.success(f"\n✓ Aplicación {domain} actualizada exitosamente"))
             else:
+                error_msg = "Error verificando aplicación después de actualización"
                 if self.progress:
-                    self.progress.error("Error verificando aplicación después de actualización")
+                    self.progress.error(error_msg)
                 else:
-                    print(Colors.error("Error verificando aplicación después de actualización"))
+                    print(Colors.error(error_msg))
 
             return success
 
         except Exception as e:
+            error_msg = f"Error actualizando {domain}: {e}"
             if self.progress:
-                self.progress.error(f"Error actualizando {domain}: {e}")
+                self.progress.error(error_msg)
             else:
-                print(Colors.error(f"Error actualizando {domain}: {e}"))
+                print(Colors.error(error_msg))
             return False
     
     def list_apps(self, detailed: bool = False):

@@ -15,7 +15,7 @@ class CmdService:
         self.encoding = 'utf-8'
         self.verbose = verbose
     
-    def run(self, command: str, check: bool = True, timeout: Optional[int] = None) -> Optional[str]:
+    def run(self, command: str, check: bool = True, timeout: Optional[int] = None, capture_output: bool = True) -> Optional[str]:
         """
         Ejecutar comando del sistema
         
@@ -23,6 +23,7 @@ class CmdService:
             command: Comando a ejecutar
             check: Si debe lanzar excepción en caso de error
             timeout: Timeout en segundos
+            capture_output: Si debe capturar la salida
             
         Returns:
             Salida del comando o None si falló
@@ -31,25 +32,38 @@ class CmdService:
             print(f"🔧 Ejecutando: {command}")
         
         try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                encoding=self.encoding,
-                timeout=timeout,
-                check=check
-            )
-            
-            output = result.stdout.strip() if result.stdout else ""
-            
-            if self.verbose:
-                if output:
-                    print(f"📤 Salida: {output}")
-                if result.stderr:
-                    print(f"⚠️  Error: {result.stderr}")
-            
-            return output
+            if capture_output:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding=self.encoding,
+                    timeout=timeout,
+                    check=check
+                )
+                
+                output = result.stdout.strip() if result.stdout else ""
+                
+                if self.verbose:
+                    if output:
+                        print(f"📤 Salida: {output}")
+                    if result.stderr:
+                        print(f"⚠️  Error: {result.stderr}")
+                
+                return output
+            else:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    timeout=timeout,
+                    check=check
+                )
+                
+                if self.verbose:
+                    print("📤 Salida no capturada (streaming)")
+                
+                return ""
             
         except subprocess.CalledProcessError as e:
             if self.verbose:
@@ -70,7 +84,7 @@ class CmdService:
                 print(f"💥 Excepción ejecutando comando: {e}")
             return None
     
-    def run_sudo(self, command: str, check: bool = True, timeout: Optional[int] = None) -> Optional[str]:
+    def run_sudo(self, command: str, check: bool = True, timeout: Optional[int] = None, capture_output: bool = True) -> Optional[str]:
         """
         Ejecutar comando con sudo (solo en sistemas Unix)
         
@@ -78,17 +92,18 @@ class CmdService:
             command: Comando a ejecutar
             check: Si debe lanzar excepción en caso de error
             timeout: Timeout en segundos
+            capture_output: Si debe capturar la salida
             
         Returns:
             Salida del comando o None si falló
         """
         if os.name == 'nt':  # Windows
             # En Windows ejecutar sin sudo
-            return self.run(command, check, timeout)
+            return self.run(command, check=check, timeout=timeout, capture_output=capture_output)
         else:
             # En Unix/Linux usar sudo
             sudo_command = f"sudo {command}"
-            return self.run(sudo_command, check, timeout)
+            return self.run(sudo_command, check=check, timeout=timeout, capture_output=capture_output)
     
     def test_command_exists(self, command: str) -> bool:
         """

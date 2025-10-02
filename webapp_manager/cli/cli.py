@@ -240,7 +240,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "add", "remove", "list", "restart", "update", 
                 "logs", "ssl", "diagnose", "repair", "status",
                 "export", "import", "types", "detect", "fix-config",
-                "version", "gui"
+                "apply-maintenance", "setup", "version", "gui"
             ],
             help="Comando a ejecutar"
         )
@@ -288,7 +288,10 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         return """
 [bold cyan]Ejemplos de Uso:[/bold cyan]
 
-[bold]📱 Aplicaciones Next.js:[/bold]
+[bold]� Configuración Inicial (Primera vez):[/bold]
+  webapp-manager setup
+  
+[bold]�📱 Aplicaciones Next.js:[/bold]
   webapp-manager add --domain app.ejemplo.com --source /ruta/app --port 3000
   webapp-manager add --domain mi-app.com --source https://github.com/usuario/mi-app.git --port 3001
   
@@ -318,6 +321,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
   webapp-manager detect --directory /ruta/app
   webapp-manager export --file backup-config.json
   webapp-manager ssl --domain app.ejemplo.com --email admin@ejemplo.com
+  webapp-manager apply-maintenance   # Aplicar páginas de mantenimiento a apps existentes
 
 [bold]Tipos de aplicación soportados:[/bold]
   • [green]nextjs[/green]  - Aplicaciones Next.js (por defecto)
@@ -362,6 +366,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "types": "Tipos de Aplicación",
                 "detect": "Detectar Tipo",
                 "fix-config": "Reparar Configuración",
+                "setup": "Configuración Inicial",
                 "version": "Información de Versión",
                 "gui": "Interfaz Gráfica"
             }
@@ -403,6 +408,10 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             return True
         elif command == "fix-config":
             return self._cmd_fix_config(args)
+        elif command == "apply-maintenance":
+            return self._cmd_apply_maintenance(args)
+        elif command == "setup":
+            return self._cmd_setup(args)
         elif command == "version":
             self._cmd_version()
             return True
@@ -1011,6 +1020,161 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         """Comando fix-config"""
         self._show_info("Función fix-config no implementada todavía")
         return True
+    
+    def _cmd_apply_maintenance(self, args) -> bool:
+        """Aplicar configuración de páginas de mantenimiento a aplicaciones existentes"""
+        try:
+            # Mostrar información sobre el comando
+            info_panel = Panel(
+                "[bold cyan]Aplicar Páginas de Mantenimiento[/bold cyan]\n\n"
+                "Este comando actualiza las configuraciones de nginx existentes para incluir:\n"
+                "• Redirección automática a páginas de mantenimiento en errores 502/503/504\n"
+                "• Páginas profesionales y modernas de actualización y error\n"
+                "• Configuración automática para todas las aplicaciones\n\n"
+                "[dim]Las páginas se sirven desde /apps/maintenance/ y se actualizan cada 30 segundos[/dim]",
+                title="ℹ️  Información",
+                style="blue"
+            )
+            self.console.print(info_panel)
+            
+            # Confirmar la operación
+            if not Confirm.ask("[yellow]¿Desea aplicar las configuraciones de mantenimiento a todas las aplicaciones?[/yellow]"):
+                self._show_info("Operación cancelada")
+                return True
+            
+            # Inicializar el manager si es necesario
+            if not self.manager:
+                self.manager = WebAppManager(verbose=self.verbose, progress_manager=self.progress_manager)
+            
+            # Obtener lista de aplicaciones
+            apps = self.manager.config_manager.list_apps()
+            
+            if not apps:
+                self._show_warning("No se encontraron aplicaciones instaladas")
+                return True
+            
+            self._show_info(f"Aplicando configuración de mantenimiento a {len(apps)} aplicaciones...")
+            
+            # Crear directorio de mantenimiento y copiar archivos
+            with self._loading("Configurando directorio de mantenimiento"):
+                self.manager.nginx_service.ensure_maintenance_directory()
+            
+            success_count = 0
+            error_count = 0
+            
+            # Procesar cada aplicación
+            for domain in apps:
+                try:
+                    app_config = self.manager.config_manager.get_app(domain)
+                    
+                    with self._loading(f"Actualizando {domain}"):
+                        if self.manager.nginx_service.has_maintenance_config(domain):
+                            self.console.print(f"  ✅ [green]{domain}[/green] - Ya tiene configuración de mantenimiento")
+                        else:
+                            if self.manager.nginx_service.update_config_with_maintenance(app_config):
+                                self.console.print(f"  ✅ [green]{domain}[/green] - Configuración aplicada exitosamente")
+                                success_count += 1
+                            else:
+                                self.console.print(f"  ❌ [red]{domain}[/red] - Error aplicando configuración")
+                                error_count += 1
+                
+                except Exception as e:
+                    self.console.print(f"  ❌ [red]{domain}[/red] - Error: {str(e)}")
+                    error_count += 1
+            
+            # Recargar nginx si hubo cambios
+            if success_count > 0:
+                with self._loading("Recargando nginx"):
+                    if self.manager.nginx_service.reload():
+                        self._show_success("Nginx recargado exitosamente")
+                    else:
+                        self._show_warning("Problemas al recargar nginx")
+            
+            # Mostrar resumen
+            summary_table = Table(title="📊 Resumen de la operación")
+            summary_table.add_column("Estado", style="bold")
+            summary_table.add_column("Cantidad", justify="right")
+            
+            summary_table.add_row("✅ Exitosas", str(success_count), style="green")
+            summary_table.add_row("❌ Con errores", str(error_count), style="red")
+            summary_table.add_row("📝 Total procesadas", str(len(apps)), style="blue")
+            
+            self.console.print(summary_table)
+            
+            if success_count > 0:
+                success_panel = Panel(
+                    "[bold green]✅ Configuración aplicada exitosamente[/bold green]\n\n"
+                    "Las aplicaciones ahora mostrarán automáticamente páginas de mantenimiento cuando:\n"
+                    "• El servicio esté caído (error 502/503/504)\n"
+                    "• Se esté realizando una actualización\n"
+                    "• Ocurra un error interno del servidor (error 500)\n\n"
+                    "[dim]Las páginas se actualizan automáticamente cada 30 segundos[/dim]",
+                    title="🎉 Completado",
+                    style="green"
+                )
+                self.console.print(success_panel)
+            
+            return error_count == 0
+            
+        except Exception as e:
+            self._show_error(f"Error aplicando configuración de mantenimiento: {str(e)}")
+            return False
+    
+    def _cmd_setup(self, args) -> bool:
+        """Ejecutar configuración inicial del sistema"""
+        try:
+            from ..services import InstallService
+            
+            # Mostrar información sobre el setup
+            setup_panel = Panel(
+                "[bold cyan]Configuración Inicial del Sistema[/bold cyan]\n\n"
+                "Este comando realizará las siguientes tareas:\n\n"
+                "• ✅ Verificar requisitos del sistema (nginx, python3, systemctl)\n"
+                "• 📄 Instalar páginas de mantenimiento en /apps/maintenance/\n"
+                "• 🔍 Verificar conflictos con el sitio default de nginx\n"
+                "• 🔧 Configurar directorios necesarios\n\n"
+                "[dim]Este comando debe ejecutarse una vez después de instalar webapp-manager[/dim]\n"
+                "[yellow]⚠️  Se requieren permisos de root (sudo)[/yellow]",
+                title="ℹ️  Información de Setup",
+                style="blue"
+            )
+            self.console.print(setup_panel)
+            
+            # Confirmar la operación
+            if not Confirm.ask("[yellow]¿Desea continuar con la configuración inicial?[/yellow]", default=True):
+                self._show_info("Configuración cancelada")
+                return True
+            
+            # Crear servicio de instalación
+            install_service = InstallService(verbose=self.verbose)
+            
+            # Ejecutar setup completo
+            with self._loading("Ejecutando configuración inicial"):
+                success = install_service.run_initial_setup()
+            
+            if success:
+                success_panel = Panel(
+                    "[bold green]✅ Configuración inicial completada exitosamente[/bold green]\n\n"
+                    "El sistema está listo para usar. Puedes:\n\n"
+                    "• Agregar tu primera aplicación:\n"
+                    "  [cyan]webapp-manager add --domain app.com --source /path --port 3000[/cyan]\n\n"
+                    "• Ver aplicaciones instaladas:\n"
+                    "  [cyan]webapp-manager list[/cyan]\n\n"
+                    "• Ver tipos de aplicaciones soportados:\n"
+                    "  [cyan]webapp-manager types[/cyan]\n\n"
+                    "[dim]Las páginas de mantenimiento se han instalado en /apps/maintenance/[/dim]",
+                    title="🎉 Setup Completado",
+                    style="green"
+                )
+                self.console.print(success_panel)
+                return True
+            else:
+                self._show_error("La configuración inicial falló. Revisa los mensajes anteriores para más detalles.")
+                return False
+                
+        except Exception as e:
+            self._show_error(f"Error durante la configuración inicial: {str(e)}")
+            return False
     
     def _cmd_version(self):
         """Mostrar información de versión"""

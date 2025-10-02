@@ -52,5 +52,8 @@ setup(
     },
     scripts=["webapp-manager.py"],
     include_package_data=True,
+    package_data={
+        '': ['apps/maintenance/*.html'],
+    },
     zip_safe=False,
 )
