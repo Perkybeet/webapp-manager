@@ -1289,3 +1289,144 @@ class WebAppManager:
 
         except Exception as e:
             print(Colors.warning(f"Error en limpieza: {e}"))
+    
+    def set_maintenance_mode(self, domain: str, enable: bool = True) -> bool:
+        """Activar o desactivar modo mantenimiento para una aplicación
+        
+        Args:
+            domain: Dominio de la aplicación
+            enable: True para activar, False para desactivar
+            
+        Returns:
+            bool: True si la operación fue exitosa
+        """
+        try:
+            # Verificar que la aplicación existe
+            if not self.config_manager.app_exists(domain):
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
+                return False
+            
+            # Obtener configuración de la app
+            app_config = self.config_manager.get_app(domain)
+            
+            if enable:
+                print(Colors.info(f"Activando modo mantenimiento para {domain}..."))
+                success = self.nginx_service.enable_maintenance_mode(app_config)
+                if success:
+                    print(Colors.success(f"✅ Modo mantenimiento activado para {domain}"))
+                    print(Colors.info(f"La página de mantenimiento se mostrará en https://{domain}"))
+                else:
+                    print(Colors.error(f"❌ Error activando modo mantenimiento para {domain}"))
+                return success
+            else:
+                print(Colors.info(f"Desactivando modo mantenimiento para {domain}..."))
+                success = self.nginx_service.disable_maintenance_mode(app_config)
+                if success:
+                    print(Colors.success(f"✅ Modo mantenimiento desactivado para {domain}"))
+                    print(Colors.info(f"La aplicación está ahora accesible en https://{domain}"))
+                else:
+                    print(Colors.error(f"❌ Error desactivando modo mantenimiento para {domain}"))
+                return success
+                
+        except Exception as e:
+            print(Colors.error(f"Error configurando modo mantenimiento: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles: {traceback.format_exc()}"))
+            return False
+    
+    def set_updating_mode(self, domain: str, enable: bool = True) -> bool:
+        """Activar o desactivar modo actualización para una aplicación
+        
+        Este modo muestra una página especial durante actualizaciones.
+        Similar al modo mantenimiento pero con mensaje diferente.
+        
+        Args:
+            domain: Dominio de la aplicación
+            enable: True para activar, False para desactivar
+            
+        Returns:
+            bool: True si la operación fue exitosa
+        """
+        try:
+            # Verificar que la aplicación existe
+            if not self.config_manager.app_exists(domain):
+                print(Colors.error(f"Aplicación {domain} no encontrada"))
+                return False
+            
+            # Obtener configuración de la app
+            app_config = self.config_manager.get_app(domain)
+            
+            if enable:
+                print(Colors.info(f"Activando modo actualización para {domain}..."))
+                # Usamos el mismo método pero especificando que es modo actualización
+                success = self.nginx_service.enable_updating_mode(app_config)
+                if success:
+                    print(Colors.success(f"✅ Modo actualización activado para {domain}"))
+                    print(Colors.info(f"La página de actualización se mostrará en https://{domain}"))
+                else:
+                    print(Colors.error(f"❌ Error activando modo actualización para {domain}"))
+                return success
+            else:
+                # Desactivar es igual que desactivar mantenimiento
+                print(Colors.info(f"Desactivando modo actualización para {domain}..."))
+                success = self.nginx_service.disable_maintenance_mode(app_config)
+                if success:
+                    print(Colors.success(f"✅ Modo actualización desactivado para {domain}"))
+                    print(Colors.info(f"La aplicación está ahora accesible en https://{domain}"))
+                else:
+                    print(Colors.error(f"❌ Error desactivando modo actualización para {domain}"))
+                return success
+                
+        except Exception as e:
+            print(Colors.error(f"Error configurando modo actualización: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles: {traceback.format_exc()}"))
+            return False
+    
+    def sync_maintenance_pages(self) -> bool:
+        """Sincronizar/actualizar las páginas de mantenimiento en el servidor
+        
+        Copia las plantillas HTML desde el repositorio al directorio /apps/maintenance/
+        
+        Returns:
+            bool: True si la sincronización fue exitosa
+        """
+        try:
+            print(Colors.info("Sincronizando páginas de mantenimiento..."))
+            
+            # Asegurar que el directorio existe y copiar páginas
+            success = self.nginx_service.ensure_maintenance_directory()
+            
+            if success:
+                # Forzar copia de todas las páginas
+                import shutil
+                template_dir = Path(__file__).parent.parent.parent / "apps" / "maintenance"
+                maintenance_dir = Path("/apps/maintenance")
+                
+                if template_dir.exists():
+                    copied = 0
+                    for html_file in template_dir.glob("*.html"):
+                        target_file = maintenance_dir / html_file.name
+                        shutil.copy2(html_file, target_file)
+                        self.cmd.run_sudo(f"chown www-data:www-data {target_file}", check=False)
+                        print(Colors.success(f"  ✅ {html_file.name} actualizado"))
+                        copied += 1
+                    
+                    print(Colors.success(f"✅ {copied} páginas de mantenimiento sincronizadas"))
+                    print(Colors.info(f"Ubicación: /apps/maintenance/"))
+                    return True
+                else:
+                    print(Colors.error("No se encontró el directorio de plantillas"))
+                    return False
+            else:
+                print(Colors.error("Error configurando directorio de mantenimiento"))
+                return False
+                
+        except Exception as e:
+            print(Colors.error(f"Error sincronizando páginas de mantenimiento: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles: {traceback.format_exc()}"))
+            return False

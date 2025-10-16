@@ -166,7 +166,7 @@ class NextJSDeployer(BaseDeployer):
     
     def get_default_start_command(self, app_config: AppConfig) -> str:
         """Comando de inicio por defecto para Next.js"""
-        return f"./node_modules/.bin/next start --port {app_config.port}"
+        return f"npx next start --port {app_config.port}"
     
     def get_default_build_command(self, app_config: AppConfig) -> str:
         """Comando de build por defecto para Next.js"""

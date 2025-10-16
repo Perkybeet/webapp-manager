@@ -240,7 +240,8 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "add", "remove", "list", "restart", "update", 
                 "logs", "ssl", "diagnose", "repair", "status",
                 "export", "import", "types", "detect", "fix-config",
-                "apply-maintenance", "setup", "version", "gui"
+                "apply-maintenance", "maintenance", "updating", "sync-pages",
+                "setup", "version", "gui"
             ],
             help="Comando a ejecutar"
         )
@@ -323,6 +324,11 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
   webapp-manager ssl --domain app.ejemplo.com --email admin@ejemplo.com
   webapp-manager apply-maintenance   # Aplicar páginas de mantenimiento a apps existentes
 
+[bold]🛠️  Modo Mantenimiento y Actualización:[/bold]
+  webapp-manager maintenance --domain app.com              # Activar/desactivar mantenimiento
+  webapp-manager updating --domain app.com                 # Activar/desactivar modo actualización
+  webapp-manager sync-pages                                # Actualizar páginas HTML en servidor
+
 [bold]Tipos de aplicación soportados:[/bold]
   • [green]nextjs[/green]  - Aplicaciones Next.js (por defecto)
   • [green]nodejs[/green]  - Aplicaciones Node.js genéricas  
@@ -366,6 +372,9 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "types": "Tipos de Aplicación",
                 "detect": "Detectar Tipo",
                 "fix-config": "Reparar Configuración",
+                "maintenance": "Modo Mantenimiento",
+                "updating": "Modo Actualización",
+                "sync-pages": "Sincronizar Páginas",
                 "setup": "Configuración Inicial",
                 "version": "Información de Versión",
                 "gui": "Interfaz Gráfica"
@@ -410,6 +419,12 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             return self._cmd_fix_config(args)
         elif command == "apply-maintenance":
             return self._cmd_apply_maintenance(args)
+        elif command == "maintenance":
+            return self._cmd_maintenance(args)
+        elif command == "updating":
+            return self._cmd_updating(args)
+        elif command == "sync-pages":
+            return self._cmd_sync_pages(args)
         elif command == "setup":
             return self._cmd_setup(args)
         elif command == "version":
@@ -1198,6 +1213,149 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         self._show_info("Abriendo interfaz gráfica con Dialog...")
         # Aquí iría la implementación de la GUI con dialog
         self._show_warning("Función GUI no implementada todavía")
+    
+    def _cmd_maintenance(self, args) -> bool:
+        """Activar o desactivar modo mantenimiento para una aplicación"""
+        try:
+            if not args.domain:
+                self._show_error("Debe especificar un dominio con --domain")
+                return False
+            
+            # Mostrar información
+            info_panel = Panel(
+                "[bold cyan]Modo Mantenimiento[/bold cyan]\n\n"
+                "El modo mantenimiento muestra una página especial a los usuarios\n"
+                "mientras se realizan tareas de mantenimiento en la aplicación.\n\n"
+                f"Dominio: [bold]{args.domain}[/bold]\n\n"
+                "[dim]Los usuarios verán una página profesional indicando que el sitio\n"
+                "está temporalmente en mantenimiento[/dim]",
+                title="ℹ️  Información",
+                style="blue"
+            )
+            self.console.print(info_panel)
+            
+            # Preguntar si activar o desactivar
+            enable = Confirm.ask(
+                "[yellow]¿Activar modo mantenimiento?[/yellow] (No = desactivar)",
+                default=True
+            )
+            
+            # Ejecutar comando
+            with self._loading(f"{'Activando' if enable else 'Desactivando'} modo mantenimiento"):
+                success = self.manager.set_maintenance_mode(args.domain, enable)
+            
+            if success:
+                if enable:
+                    self._show_success(f"✅ Modo mantenimiento activado para {args.domain}")
+                    self.console.print(f"[dim]Los usuarios verán la página de mantenimiento en https://{args.domain}[/dim]")
+                else:
+                    self._show_success(f"✅ Modo mantenimiento desactivado para {args.domain}")
+                    self.console.print(f"[dim]La aplicación está nuevamente accesible en https://{args.domain}[/dim]")
+            else:
+                self._show_error(f"❌ Error configurando modo mantenimiento para {args.domain}")
+            
+            return success
+            
+        except Exception as e:
+            self._show_error(f"Error en comando maintenance: {str(e)}")
+            return False
+    
+    def _cmd_updating(self, args) -> bool:
+        """Activar o desactivar modo actualización para una aplicación"""
+        try:
+            if not args.domain:
+                self._show_error("Debe especificar un dominio con --domain")
+                return False
+            
+            # Mostrar información
+            info_panel = Panel(
+                "[bold cyan]Modo Actualización[/bold cyan]\n\n"
+                "El modo actualización muestra una página especial indicando que\n"
+                "se está actualizando la aplicación.\n\n"
+                f"Dominio: [bold]{args.domain}[/bold]\n\n"
+                "[dim]Los usuarios verán una página profesional con un mensaje\n"
+                "indicando que la aplicación se está actualizando[/dim]",
+                title="ℹ️  Información",
+                style="blue"
+            )
+            self.console.print(info_panel)
+            
+            # Preguntar si activar o desactivar
+            enable = Confirm.ask(
+                "[yellow]¿Activar modo actualización?[/yellow] (No = desactivar)",
+                default=True
+            )
+            
+            # Ejecutar comando
+            with self._loading(f"{'Activando' if enable else 'Desactivando'} modo actualización"):
+                success = self.manager.set_updating_mode(args.domain, enable)
+            
+            if success:
+                if enable:
+                    self._show_success(f"✅ Modo actualización activado para {args.domain}")
+                    self.console.print(f"[dim]Los usuarios verán la página de actualización en https://{args.domain}[/dim]")
+                else:
+                    self._show_success(f"✅ Modo actualización desactivado para {args.domain}")
+                    self.console.print(f"[dim]La aplicación está nuevamente accesible en https://{args.domain}[/dim]")
+            else:
+                self._show_error(f"❌ Error configurando modo actualización para {args.domain}")
+            
+            return success
+            
+        except Exception as e:
+            self._show_error(f"Error en comando updating: {str(e)}")
+            return False
+    
+    def _cmd_sync_pages(self, args) -> bool:
+        """Sincronizar/actualizar páginas de mantenimiento en el servidor"""
+        try:
+            # Mostrar información
+            info_panel = Panel(
+                "[bold cyan]Sincronizar Páginas de Mantenimiento[/bold cyan]\n\n"
+                "Este comando actualiza las páginas HTML de mantenimiento en el servidor\n"
+                "copiándolas desde el repositorio a /apps/maintenance/\n\n"
+                "Páginas incluidas:\n"
+                "• [green]maintenance.html[/green] - Página de mantenimiento programado\n"
+                "• [green]updating.html[/green] - Página de actualización en progreso\n"
+                "• [green]error502.html[/green] - Página de error del servidor\n\n"
+                "[dim]Usa este comando después de actualizar webapp-manager para obtener\n"
+                "las últimas versiones de las páginas[/dim]",
+                title="ℹ️  Información",
+                style="blue"
+            )
+            self.console.print(info_panel)
+            
+            # Confirmar
+            if not Confirm.ask("[yellow]¿Desea actualizar las páginas de mantenimiento?[/yellow]", default=True):
+                self._show_info("Operación cancelada")
+                return True
+            
+            # Ejecutar sincronización
+            with self._loading("Sincronizando páginas de mantenimiento"):
+                success = self.manager.sync_maintenance_pages()
+            
+            if success:
+                success_panel = Panel(
+                    "[bold green]✅ Páginas de mantenimiento actualizadas[/bold green]\n\n"
+                    "Las páginas HTML se han copiado a /apps/maintenance/\n\n"
+                    "Ahora puedes:\n"
+                    "• Activar modo mantenimiento:\n"
+                    "  [cyan]webapp-manager maintenance --domain app.com[/cyan]\n\n"
+                    "• Activar modo actualización:\n"
+                    "  [cyan]webapp-manager updating --domain app.com[/cyan]\n\n"
+                    "[dim]Las páginas se sirven automáticamente cuando hay errores 502/503/504[/dim]",
+                    title="🎉 Completado",
+                    style="green"
+                )
+                self.console.print(success_panel)
+            else:
+                self._show_error("Error sincronizando páginas de mantenimiento")
+            
+            return success
+            
+        except Exception as e:
+            self._show_error(f"Error en comando sync-pages: {str(e)}")
+            return False
 
 
 def main():

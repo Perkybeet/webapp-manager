@@ -313,7 +313,7 @@ class SystemdService:
     def _get_default_start_command(self, app_type: str, port: int) -> str:
         """Obtener comando de inicio por defecto"""
         commands = {
-            "nextjs": f"./node_modules/.bin/next start --port {port}",
+            "nextjs": f"npx next start --port {port}",
             "node": "node server.js",
             "fastapi": f".venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port {port} --workers 1",
             "static": ""
