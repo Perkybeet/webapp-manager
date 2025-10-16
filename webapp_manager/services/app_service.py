@@ -732,71 +732,161 @@ class AppService:
             print(Colors.success("Uvicorn ya está instalado"))
 
     def _rebuild_application(self, app_dir: Path, app_config: AppConfig) -> bool:
-        """Reconstruir aplicación existente (solo build, no reinstalar dependencias)"""
+        """
+        Reconstruir aplicación en directorio temporal (instalación limpia completa)
+        
+        Este método se usa durante actualizaciones para construir la nueva versión
+        en un directorio temporal antes de hacer el swap atómico.
+        """
         try:
             if app_config.app_type in ["nextjs", "node"]:
-                # Verificar si node_modules existe
-                if not (app_dir / "node_modules").exists():
-                    print(Colors.info("node_modules no existe, instalando dependencias..."))
-                    install_result = self.cmd.run(f"cd {app_dir} && npm install", check=False)
-                    if not install_result:
-                        print(Colors.error("Error instalando dependencias"))
-                        return False
+                print(Colors.info("🧹 Limpiando instalación anterior..."))
+                
+                # CRÍTICO: Limpiar node_modules y package-lock.json para evitar problemas de rutas
+                node_modules = app_dir / "node_modules"
+                package_lock = app_dir / "package-lock.json"
+                next_cache = app_dir / ".next"
+                
+                # Eliminar node_modules si existe
+                if node_modules.exists():
+                    if self.verbose:
+                        print(Colors.info("  Eliminando node_modules..."))
+                    shutil.rmtree(node_modules)
+                
+                # Eliminar package-lock.json si existe
+                if package_lock.exists():
+                    if self.verbose:
+                        print(Colors.info("  Eliminando package-lock.json..."))
+                    package_lock.unlink()
+                
+                # Eliminar .next si existe (cache de Next.js)
+                if next_cache.exists():
+                    if self.verbose:
+                        print(Colors.info("  Eliminando caché .next..."))
+                    shutil.rmtree(next_cache)
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Limpieza completada"))
+                
+                # Instalación limpia de dependencias
+                print(Colors.info("📦 Instalando dependencias npm (instalación limpia)..."))
+                install_result = self.cmd.run(
+                    f"cd {app_dir} && npm install --production=false",
+                    check=False
+                )
+                
+                if not install_result:
+                    print(Colors.error("❌ Error instalando dependencias npm"))
+                    return False
+                
+                # Verificar que node_modules se creó correctamente
+                if not node_modules.exists():
+                    print(Colors.error("❌ node_modules no se creó correctamente"))
+                    return False
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Dependencias instaladas correctamente"))
 
                 # Solo hacer build si es Next.js
                 if app_config.app_type == "nextjs":
-                    print(Colors.info("Construyendo aplicación Next.js..."))
+                    print(Colors.info("🔨 Construyendo aplicación Next.js..."))
+                    
+                    # Configurar permisos antes del build
+                    node_modules_bin = app_dir / "node_modules" / ".bin"
+                    if node_modules_bin.exists():
+                        self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+                        if self.verbose:
+                            print(Colors.info("  Permisos configurados para node_modules/.bin/"))
+                    
+                    # Construir con variables de entorno necesarias
                     build_cmd = app_config.build_command or "npm run build"
-                    build_result = self.cmd.run(f"cd {app_dir} && {build_cmd}", check=False)
+                    env_vars = "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1"
+                    
+                    build_result = self.cmd.run(
+                        f"cd {app_dir} && {env_vars} {build_cmd}",
+                        check=False
+                    )
+                    
                     if not build_result:
-                        print(Colors.error("Error construyendo aplicación Next.js"))
+                        print(Colors.error("❌ Error construyendo aplicación Next.js"))
                         return False
+                    
+                    # Verificar que .next se creó
+                    if not next_cache.exists():
+                        print(Colors.error("❌ Build no generó directorio .next"))
+                        return False
+                    
+                    # Verificar archivos críticos del build
+                    build_id = next_cache / "BUILD_ID"
+                    build_manifest = next_cache / "build-manifest.json"
+                    
+                    if not build_id.exists():
+                        print(Colors.warning("⚠️  BUILD_ID no encontrado, generando..."))
+                        import uuid
+                        build_id.write_text(str(uuid.uuid4())[:8])
+                    
+                    if self.verbose:
+                        print(Colors.success("  ✓ Build completado exitosamente"))
                 
-                # Configurar permisos de ejecución para node_modules/.bin/
+                # Configurar permisos finales de ejecución
                 node_modules_bin = app_dir / "node_modules" / ".bin"
                 if node_modules_bin.exists():
-                    self.cmd.run(f"chmod +x {node_modules_bin}/*", check=False)
-                    print(Colors.info("Permisos de ejecución configurados para node_modules/.bin/"))
+                    self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+                    if self.verbose:
+                        print(Colors.info("  Permisos finales configurados"))
 
             elif app_config.app_type == "fastapi":
-                # Verificar si el entorno virtual existe
+                print(Colors.info("🐍 Configurando aplicación FastAPI..."))
+                
+                # Limpiar entorno virtual anterior si existe
                 venv_dir = app_dir / ".venv"
-                if not venv_dir.exists():
-                    print(Colors.info("Entorno virtual no existe, creando..."))
-                    venv_result = self.cmd.run(f"cd {app_dir} && python3 -m venv .venv", check=False)
-                    if not venv_result:
-                        print(Colors.error("Error creando entorno virtual"))
-                        return False
+                if venv_dir.exists():
+                    if self.verbose:
+                        print(Colors.info("  Eliminando entorno virtual anterior..."))
+                    shutil.rmtree(venv_dir)
+                
+                # Crear nuevo entorno virtual
+                print(Colors.info("  Creando entorno virtual Python..."))
+                venv_result = self.cmd.run(f"cd {app_dir} && python3 -m venv .venv", check=False)
+                if not venv_result:
+                    print(Colors.error("❌ Error creando entorno virtual"))
+                    return False
 
-                    # Instalar dependencias
-                    requirements_file = app_dir / "requirements.txt"
-                    if requirements_file.exists():
-                        print(Colors.info("Instalando dependencias desde requirements.txt..."))
-                        install_deps = self.cmd.run(
-                            f"cd {app_dir} && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt",
-                            check=False,
-                        )
-                        if not install_deps:
-                            print(Colors.error("Error instalando dependencias de Python"))
-                            return False
-                    else:
-                        print(Colors.info("Instalando dependencias básicas..."))
-                        install_basic = self.cmd.run(
-                            f"cd {app_dir} && .venv/bin/pip install --upgrade pip && .venv/bin/pip install fastapi uvicorn[standard]",
-                            check=False,
-                        )
-                        if not install_basic:
-                            print(Colors.error("Error instalando dependencias básicas"))
-                            return False
+                # Instalar dependencias
+                requirements_file = app_dir / "requirements.txt"
+                if requirements_file.exists():
+                    print(Colors.info("  Instalando dependencias desde requirements.txt..."))
+                    install_deps = self.cmd.run(
+                        f"cd {app_dir} && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt",
+                        check=False,
+                    )
+                    if not install_deps:
+                        print(Colors.error("❌ Error instalando dependencias de Python"))
+                        return False
+                else:
+                    print(Colors.info("  Instalando dependencias básicas..."))
+                    install_basic = self.cmd.run(
+                        f"cd {app_dir} && .venv/bin/pip install --upgrade pip && .venv/bin/pip install fastapi uvicorn[standard]",
+                        check=False,
+                    )
+                    if not install_basic:
+                        print(Colors.error("❌ Error instalando dependencias básicas"))
+                        return False
 
                 # Configurar permisos del entorno virtual
                 self.cmd.run(f"chmod +x {app_dir}/.venv/bin/*", check=False)
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Aplicación FastAPI configurada"))
 
-            print(Colors.success("Aplicación reconstruida exitosamente"))
+            print(Colors.success("✅ Aplicación reconstruida exitosamente en directorio temporal"))
             return True
 
         except Exception as e:
-            print(Colors.error(f"Error reconstruyendo aplicación: {e}"))
+            print(Colors.error(f"❌ Error reconstruyendo aplicación: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
             return False
 
     def _finalize_deployment(self, app_dir: Path, temp_dir: Path) -> bool:

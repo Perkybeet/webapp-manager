@@ -264,6 +264,10 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         parser.add_argument("--start-command", help="Comando personalizado de inicio")
         parser.add_argument("--env", action="append", help="Variables de entorno (KEY=VALUE)")
         
+        # Opciones para maintenance/updating
+        parser.add_argument("--enable", action="store_true", help="Activar modo mantenimiento/actualización")
+        parser.add_argument("--disable", action="store_true", help="Desactivar modo mantenimiento/actualización")
+        
         # Opciones para logs
         parser.add_argument("--lines", "-l", type=int, default=50, help="Número de líneas de log (default: 50)")
         parser.add_argument("--follow", "-f", action="store_true", help="Seguir logs en tiempo real")
@@ -325,9 +329,20 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
   webapp-manager apply-maintenance   # Aplicar páginas de mantenimiento a apps existentes
 
 [bold]🛠️  Modo Mantenimiento y Actualización:[/bold]
-  webapp-manager maintenance --domain app.com              # Activar/desactivar mantenimiento
-  webapp-manager updating --domain app.com                 # Activar/desactivar modo actualización
-  webapp-manager sync-pages                                # Actualizar páginas HTML en servidor
+  # Modo interactivo (pregunta si activar/desactivar)
+  webapp-manager maintenance --domain app.com
+  webapp-manager updating --domain app.com
+  
+  # Activar explícitamente
+  webapp-manager maintenance --domain app.com --enable
+  webapp-manager updating --domain app.com --enable
+  
+  # Desactivar explícitamente  
+  webapp-manager maintenance --domain app.com --disable
+  webapp-manager updating --domain app.com --disable
+  
+  # Sincronizar páginas HTML
+  webapp-manager sync-pages
 
 [bold]Tipos de aplicación soportados:[/bold]
   • [green]nextjs[/green]  - Aplicaciones Next.js (por defecto)
@@ -1221,36 +1236,50 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 self._show_error("Debe especificar un dominio con --domain")
                 return False
             
-            # Mostrar información
-            info_panel = Panel(
-                "[bold cyan]Modo Mantenimiento[/bold cyan]\n\n"
-                "El modo mantenimiento muestra una página especial a los usuarios\n"
-                "mientras se realizan tareas de mantenimiento en la aplicación.\n\n"
-                f"Dominio: [bold]{args.domain}[/bold]\n\n"
-                "[dim]Los usuarios verán una página profesional indicando que el sitio\n"
-                "está temporalmente en mantenimiento[/dim]",
-                title="ℹ️  Información",
-                style="blue"
-            )
-            self.console.print(info_panel)
+            # Determinar si activar o desactivar
+            if args.enable and args.disable:
+                self._show_error("No puedes usar --enable y --disable al mismo tiempo")
+                return False
             
-            # Preguntar si activar o desactivar
-            enable = Confirm.ask(
-                "[yellow]¿Activar modo mantenimiento?[/yellow] (No = desactivar)",
-                default=True
-            )
+            # Si se especificó --enable o --disable, usarlo directamente
+            if args.enable:
+                enable = True
+            elif args.disable:
+                enable = False
+            else:
+                # Modo interactivo
+                info_panel = Panel(
+                    "[bold cyan]Modo Mantenimiento[/bold cyan]\n\n"
+                    "El modo mantenimiento muestra una página especial a los usuarios\n"
+                    "mientras se realizan tareas de mantenimiento en la aplicación.\n\n"
+                    f"Dominio: [bold]{args.domain}[/bold]\n\n"
+                    "[dim]Los usuarios verán una página profesional indicando que el sitio\n"
+                    "está temporalmente en mantenimiento[/dim]",
+                    title="ℹ️  Información",
+                    style="blue"
+                )
+                self.console.print(info_panel)
+                
+                # Preguntar si activar o desactivar
+                enable = Confirm.ask(
+                    "[yellow]¿Activar modo mantenimiento?[/yellow] (No = desactivar)",
+                    default=True
+                )
             
             # Ejecutar comando
-            with self._loading(f"{'Activando' if enable else 'Desactivando'} modo mantenimiento"):
+            action_text = "Activando" if enable else "Desactivando"
+            with self._loading(f"{action_text} modo mantenimiento"):
                 success = self.manager.set_maintenance_mode(args.domain, enable)
             
             if success:
                 if enable:
                     self._show_success(f"✅ Modo mantenimiento activado para {args.domain}")
                     self.console.print(f"[dim]Los usuarios verán la página de mantenimiento en https://{args.domain}[/dim]")
+                    self.console.print(f"[bold yellow]Para desactivar:[/bold yellow] webapp-manager maintenance --domain {args.domain} --disable")
                 else:
                     self._show_success(f"✅ Modo mantenimiento desactivado para {args.domain}")
                     self.console.print(f"[dim]La aplicación está nuevamente accesible en https://{args.domain}[/dim]")
+                    self.console.print(f"[bold green]✓[/bold green] Configuración anterior restaurada desde backup")
             else:
                 self._show_error(f"❌ Error configurando modo mantenimiento para {args.domain}")
             
@@ -1267,36 +1296,50 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 self._show_error("Debe especificar un dominio con --domain")
                 return False
             
-            # Mostrar información
-            info_panel = Panel(
-                "[bold cyan]Modo Actualización[/bold cyan]\n\n"
-                "El modo actualización muestra una página especial indicando que\n"
-                "se está actualizando la aplicación.\n\n"
-                f"Dominio: [bold]{args.domain}[/bold]\n\n"
-                "[dim]Los usuarios verán una página profesional con un mensaje\n"
-                "indicando que la aplicación se está actualizando[/dim]",
-                title="ℹ️  Información",
-                style="blue"
-            )
-            self.console.print(info_panel)
+            # Determinar si activar o desactivar
+            if args.enable and args.disable:
+                self._show_error("No puedes usar --enable y --disable al mismo tiempo")
+                return False
             
-            # Preguntar si activar o desactivar
-            enable = Confirm.ask(
-                "[yellow]¿Activar modo actualización?[/yellow] (No = desactivar)",
-                default=True
-            )
+            # Si se especificó --enable o --disable, usarlo directamente
+            if args.enable:
+                enable = True
+            elif args.disable:
+                enable = False
+            else:
+                # Modo interactivo
+                info_panel = Panel(
+                    "[bold cyan]Modo Actualización[/bold cyan]\n\n"
+                    "El modo actualización muestra una página especial indicando que\n"
+                    "se está actualizando la aplicación.\n\n"
+                    f"Dominio: [bold]{args.domain}[/bold]\n\n"
+                    "[dim]Los usuarios verán una página profesional con un mensaje\n"
+                    "indicando que la aplicación se está actualizando[/dim]",
+                    title="ℹ️  Información",
+                    style="blue"
+                )
+                self.console.print(info_panel)
+                
+                # Preguntar si activar o desactivar
+                enable = Confirm.ask(
+                    "[yellow]¿Activar modo actualización?[/yellow] (No = desactivar)",
+                    default=True
+                )
             
             # Ejecutar comando
-            with self._loading(f"{'Activando' if enable else 'Desactivando'} modo actualización"):
+            action_text = "Activando" if enable else "Desactivando"
+            with self._loading(f"{action_text} modo actualización"):
                 success = self.manager.set_updating_mode(args.domain, enable)
             
             if success:
                 if enable:
                     self._show_success(f"✅ Modo actualización activado para {args.domain}")
                     self.console.print(f"[dim]Los usuarios verán la página de actualización en https://{args.domain}[/dim]")
+                    self.console.print(f"[bold yellow]Para desactivar:[/bold yellow] webapp-manager updating --domain {args.domain} --disable")
                 else:
                     self._show_success(f"✅ Modo actualización desactivado para {args.domain}")
                     self.console.print(f"[dim]La aplicación está nuevamente accesible en https://{args.domain}[/dim]")
+                    self.console.print(f"[bold green]✓[/bold green] Configuración anterior restaurada desde backup")
             else:
                 self._show_error(f"❌ Error configurando modo actualización para {args.domain}")
             
