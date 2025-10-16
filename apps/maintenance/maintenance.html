@@ -12,42 +12,26 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            background: #0f172a;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #333;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
         }
 
-        .container {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 3rem 2rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            width: 90%;
-            backdrop-filter: blur(10px);
-        }
-
-        .icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 2rem;
-            background: linear-gradient(45deg, #f39c12, #e67e22);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            animation: rotate 3s linear infinite;
-        }
-
-        .icon::before {
-            content: '⚙';
-            color: white;
-            font-size: 2.5rem;
+        /* Animated background gradient */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(251, 146, 60, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(251, 146, 60, 0.15) 0%, transparent 50%);
+            animation: rotate 20s linear infinite;
         }
 
         @keyframes rotate {
@@ -55,51 +39,163 @@
             100% { transform: rotate(360deg); }
         }
 
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 3.5rem 2.5rem;
+            border-radius: 24px;
+            border: 1px solid rgba(251, 146, 60, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-width: 520px;
+            width: 100%;
+            backdrop-filter: blur(20px);
+        }
+
+        .icon-container {
+            position: relative;
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 2rem;
+        }
+
+        .icon {
+            width: 96px;
+            height: 96px;
+            background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 40px rgba(251, 146, 60, 0.4);
+        }
+
+        .icon svg {
+            width: 48px;
+            height: 48px;
+            stroke: white;
+            stroke-width: 2;
+            fill: none;
+            animation: rotate-gear 4s linear infinite;
+        }
+
+        @keyframes rotate-gear {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-badge {
+            display: inline-block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #fdba74;
+            background: rgba(251, 146, 60, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+            letter-spacing: 0.05em;
+        }
+
         h1 {
-            font-size: 2.2rem;
+            font-size: 2rem;
             margin-bottom: 1rem;
-            color: #2c3e50;
-            font-weight: 300;
+            color: #f1f5f9;
+            font-weight: 600;
+            letter-spacing: -0.025em;
         }
 
         .subtitle {
-            font-size: 1.1rem;
-            color: #5a6c7d;
+            font-size: 1rem;
+            color: #94a3b8;
             margin-bottom: 2rem;
             line-height: 1.6;
+            font-weight: 400;
         }
 
         .maintenance-info {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 10px;
+            background: rgba(251, 146, 60, 0.05);
+            border: 1px solid rgba(251, 146, 60, 0.1);
+            border-radius: 16px;
             padding: 1.5rem;
             margin: 2rem 0;
+            text-align: left;
         }
 
         .maintenance-info h3 {
-            color: #856404;
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
+            color: #fdba74;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
         }
 
         .maintenance-info p {
-            color: #856404;
-            font-size: 0.95rem;
-            line-height: 1.5;
+            color: #cbd5e1;
+            font-size: 0.875rem;
+            line-height: 1.6;
         }
 
         .message {
-            font-size: 0.95rem;
-            color: #7f8c8d;
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            margin-top: 2rem;
+            line-height: 1.6;
+        }
+
+        .retry-info {
+            font-size: 0.8125rem;
+            color: #64748b;
             margin-top: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .retry-info::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #64748b;
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 2.5rem 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .subtitle {
+                font-size: 0.9375rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="icon"></div>
+        <div class="icon-container">
+            <div class="icon">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m10-11h-6m-6 0H1m16.364 12.364l-4.243-4.243m-6.364 0L2.636 18.364m15.556-15.556l-4.243 4.243m-6.364 0L2.636 2.636"></path>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="status-badge">MANTENIMIENTO</div>
+        
         <h1>Mantenimiento Programado</h1>
+        
         <p class="subtitle">
             Estamos realizando tareas de mantenimiento para mejorar nuestros servicios.
         </p>
@@ -112,13 +208,14 @@
         <p class="message">
             Gracias por tu paciencia. El servicio se restablecerá automáticamente una vez finalizado el mantenimiento.
         </p>
+        
+        <p class="retry-info">
+            Actualización automática en 60 segundos
+        </p>
     </div>
 
     <script>
-        // Auto-refresh every 60 seconds for maintenance mode
-        setTimeout(function() {
-            window.location.reload();
-        }, 60000);
+        setTimeout(() => window.location.reload(), 60000);
     </script>
 </body>
 </html>

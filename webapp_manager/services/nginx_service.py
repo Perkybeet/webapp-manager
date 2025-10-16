@@ -166,8 +166,30 @@ class NginxService:
             template_path = Path(__file__).parent.parent / "templates" / "maintenance.html"
             shutil.copy2(template_path, maintenance_dir / "index.html")
             
-            config_content = self._get_maintenance_config(app_config)
+            # Leer la configuración actual para preservar SSL si existe
             config_path = self.nginx_sites / app_config.domain
+            has_ssl = False
+            ssl_lines = []
+            
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    content = f.read()
+                    # Detectar si tiene SSL configurado
+                    has_ssl = 'ssl_certificate' in content and 'listen 443' in content
+                    
+                    if has_ssl:
+                        # Extraer las líneas SSL para preservarlas
+                        import re
+                        # Buscar el bloque del servidor SSL (puerto 443)
+                        ssl_block_match = re.search(
+                            r'server\s*\{[^}]*listen\s+443\s+ssl[^}]*ssl_certificate[^}]*\}',
+                            content,
+                            re.DOTALL
+                        )
+                        if ssl_block_match:
+                            ssl_lines = ssl_block_match.group(0)
+            
+            config_content = self._get_maintenance_config(app_config, has_ssl, ssl_lines)
             temp_config_path = self.nginx_sites / f"{app_config.domain}.maintenance"
 
             # Escribir configuración temporal
@@ -178,6 +200,8 @@ class NginxService:
             test_result = self.cmd.run_sudo("nginx -t 2>&1", check=False)
             if not (test_result and "syntax is ok" in test_result and "test is successful" in test_result):
                 print(f"Error en configuración de mantenimiento: {test_result}")
+                if temp_config_path.exists():
+                    temp_config_path.unlink()
                 return False
 
             # Backup de configuración original
@@ -202,15 +226,55 @@ class NginxService:
 
             # Restaurar configuración original si existe backup
             if backup_path.exists():
-                shutil.move(backup_path, config_path)
+                if self.verbose:
+                    print(Colors.info(f"Restaurando configuración desde backup: {backup_path}"))
+                
+                # Verificar que el backup es válido antes de restaurar
+                temp_restore = self.nginx_sites / f"{app_config.domain}.restore_temp"
+                shutil.copy2(backup_path, temp_restore)
+                
+                # Temporalmente mover la configuración actual
+                if config_path.exists():
+                    temp_current = self.nginx_sites / f"{app_config.domain}.current_temp"
+                    shutil.move(config_path, temp_current)
+                
+                # Intentar usar el backup
+                shutil.move(temp_restore, config_path)
+                
+                # Verificar que nginx acepta la configuración
+                test_result = self.cmd.run_sudo("nginx -t 2>&1", check=False)
+                if test_result and "syntax is ok" in test_result and "test is successful" in test_result:
+                    # Configuración válida, eliminar backups temporales
+                    if Path(temp_current).exists():
+                        Path(temp_current).unlink()
+                    backup_path.unlink()  # Eliminar el backup usado
+                    
+                    if self.verbose:
+                        print(Colors.success("Configuración restaurada correctamente"))
+                else:
+                    # Configuración inválida, restaurar la configuración de mantenimiento
+                    if self.verbose:
+                        print(Colors.warning("Backup inválido, restaurando configuración de mantenimiento"))
+                    config_path.unlink()
+                    shutil.move(temp_current, config_path)
+                    
+                    # Como el backup falló, recrear configuración normal
+                    if self.verbose:
+                        print(Colors.info("Recreando configuración normal"))
+                    return self.create_config(app_config)
             else:
-                # Recrear configuración normal si no hay backup
+                # No hay backup, recrear configuración normal
+                if self.verbose:
+                    print(Colors.info(f"No se encontró backup, recreando configuración para {app_config.domain}"))
                 return self.create_config(app_config)
 
             # Recargar nginx
             return self.reload()
         except Exception as e:
-            print(f"Error desactivando modo mantenimiento: {e}")
+            print(Colors.error(f"Error desactivando modo mantenimiento: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles: {traceback.format_exc()}"))
             return False
 
     def _enable_site(self, domain: str):
@@ -511,9 +575,10 @@ server {{
     }}
 }}"""
 
-    def _get_maintenance_config(self, app_config: AppConfig) -> str:
-        """Configuración para modo mantenimiento"""
-        return f"""# Maintenance Mode: {app_config.domain}
+    def _get_maintenance_config(self, app_config: AppConfig, has_ssl: bool = False, ssl_config: str = "") -> str:
+        """Configuración para modo mantenimiento con soporte SSL"""
+        # Configuración base HTTP
+        base_config = f"""# Maintenance Mode: {app_config.domain}
 # Generated by WebApp Manager v3.0
 # Date: {datetime.now().isoformat()}
 
@@ -541,48 +606,33 @@ server {{
     }}
 }}"""
 
+        # Si tiene SSL, preservar la configuración SSL
+        if has_ssl and ssl_config:
+            # Modificar el bloque SSL para servir la página de mantenimiento
+            import re
+            # Reemplazar las directivas de proxy con las de mantenimiento
+            ssl_maintenance = re.sub(
+                r'location\s+/\s*\{[^}]*\}',
+                '''location / {
+        root /var/www/maintenance;
+        index index.html;
+        try_files /index.html =404;
+    }
+    
+    # Cache maintenance page briefly
+    location ~* \\.(html)$ {
+        expires 30s;
+        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+    }''',
+                ssl_config,
+                flags=re.DOTALL
+            )
+            
+            return base_config + "\n\n" + ssl_maintenance
+        
+        return base_config
+
     def _get_default_config(self, app_config: AppConfig) -> str:
         """Configuración por defecto"""
         return self._get_node_config(app_config)
 
-    def _get_maintenance_config(self, app_config: AppConfig) -> str:
-        """Obtener configuración para modo mantenimiento"""
-        return f"""# Modo Mantenimiento: {app_config.domain}
-# Generated by WebApp Manager v3.0
-# Date: {datetime.now().isoformat()}
-
-server {{
-    listen 80;
-    server_name {app_config.domain};
-
-    # Ruta al directorio de mantenimiento
-    location / {{
-        root /var/www/maintenance;
-        index index.html;
-        try_files $uri $uri/ =404;
-    }}
-
-    # Logs
-    access_log /var/log/apps/{app_config.domain}-access.log combined;
-    error_log /var/log/apps/{app_config.domain}-error.log warn;
-
-    # Seguridad adicional
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-
-    # Health check
-    location /nginx-health {{
-        access_log off;
-        return 200 "nginx healthy\\n";
-        add_header Content-Type text/plain;
-    }}
-
-    # Bloquear acceso a archivos sensibles
-    location ~ /\\. {{
-        deny all;
-        access_log off;
-        log_not_found off;
-    }}
-}}"""
