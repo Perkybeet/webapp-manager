@@ -143,12 +143,11 @@ class AppService:
 
     def update_app(self, domain: str, app_config: AppConfig) -> bool:
         """
-        Actualizar aplicación existente con zero-downtime deployment
-        La aplicación se actualiza en una copia temporal y solo se cambia cuando está lista
+        Actualizar aplicación existente directamente en su carpeta original
+        No crea copias temporales, actualiza el código mediante git pull
         """
         try:
             app_dir = self.apps_dir / domain
-            update_dir = self.apps_dir / f"{domain}_update"
             backup_dir = self.apps_dir / f"{domain}_backup"
 
             if not app_config.source.startswith(("http", "git@")):
@@ -167,176 +166,90 @@ class AppService:
                     print(Colors.error(error_msg))
                 return False
 
-            # Paso 1: Crear copia de trabajo para actualización (excluyendo node_modules y otros)
+            # Paso 1: Crear backup de seguridad
             if self.verbose:
-                print(Colors.info("  Creando copia de trabajo para actualización (sin node_modules)"))
-            if update_dir.exists():
-                shutil.rmtree(update_dir)
+                print(Colors.info("  Creando backup de seguridad"))
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
             
-            # Copiar excluyendo directorios problemáticos con enlaces simbólicos
-            def ignore_patterns(directory, contents):
-                """Ignorar node_modules y otros directorios con enlaces simbólicos"""
-                ignore = set()
-                if 'node_modules' in contents:
-                    ignore.add('node_modules')
-                if '.next' in contents:
-                    ignore.add('.next')
-                if '.venv' in contents:
-                    ignore.add('.venv')
-                if '__pycache__' in contents:
-                    ignore.add('__pycache__')
-                return ignore
-            
-            shutil.copytree(app_dir, update_dir, ignore=ignore_patterns)
+            # Backup completo para poder revertir si algo sale mal
+            shutil.copytree(app_dir, backup_dir)
             if self.verbose:
-                print(Colors.success(f"  Copia de trabajo creada (sin enlaces simbólicos): {update_dir}"))
+                print(Colors.success(f"  Backup creado en: {backup_dir}"))
 
-            # Paso 2: Configurar permisos para Git en la copia
+            # Paso 2: Configurar permisos para Git
             if self.verbose:
                 print(Colors.info("  Configurando permisos para Git"))
-            self.cmd.run_sudo(f"chown root:root {update_dir}", check=False)
-            self._configure_git_safe_directory(update_dir)
-            
-            try:
-                git_status = self.cmd.run(f"cd {update_dir} && git status --porcelain", check=False)
-            except Exception as e:
-                if self.verbose:
-                    print(Colors.warning(f"  Advertencia Git: {e}"))
+            self.cmd.run_sudo(f"chown root:root {app_dir}", check=False)
+            self._configure_git_safe_directory(app_dir)
 
-            # Paso 3: Actualizar código en la copia
+            # Paso 3: Actualizar código directamente con git pull
             if self.verbose:
-                print(Colors.info("  Actualizando código desde repositorio"))
-            update_success, used_branch = self._update_git_with_branch_fallback(update_dir, app_config.branch)
+                print(Colors.info("  Actualizando código desde repositorio (git pull)"))
+            
+            update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
             
             if not update_success:
                 print(Colors.error("Error actualizando código - ninguna rama válida encontrada"))
-                if update_dir.exists():
-                    shutil.rmtree(update_dir)
+                # Revertir desde backup
+                if backup_dir.exists():
+                    shutil.rmtree(app_dir)
+                    shutil.copytree(backup_dir, app_dir)
+                    print(Colors.info("Aplicación revertida desde backup"))
                 return False
             
             if used_branch != app_config.branch:
                 print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
 
-            # Paso 4: Reconstruir aplicación
-            # Para Next.js: hacer build en la carpeta original para evitar problemas con rutas
-            # Para otros: reconstruir en la copia
-            if self.verbose:
-                if app_config.app_type == "nextjs":
-                    print(Colors.info("  Construyendo Next.js en carpeta original (evitando problemas de rutas)"))
-                else:
-                    print(Colors.info("  Reconstruyendo aplicación en copia temporal"))
-            
-            self.cmd.run_sudo(f"chown www-data:www-data {update_dir}", check=False)
-            
-            if app_config.app_type == "nextjs":
-                # Para Next.js: actualizar dependencias y hacer build en carpeta ORIGINAL
-                if not self._rebuild_nextjs_in_place(app_dir, app_config):
-                    print(Colors.error("Error construyendo aplicación Next.js"))
-                    if update_dir.exists():
-                        shutil.rmtree(update_dir)
-                    return False
-            else:
-                # Para otros tipos: reconstruir en la copia temporal
-                if not self._rebuild_application(update_dir, app_config):
-                    print(Colors.error("Error reconstruyendo aplicación"))
-                    if update_dir.exists():
-                        shutil.rmtree(update_dir)
-                    return False
+            # Paso 4: Cambiar propietario a www-data para instalar dependencias
+            self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}", check=False)
 
-            # Paso 5: Configurar permisos
+            # Paso 5: Instalar/actualizar dependencias
             if self.verbose:
-                print(Colors.info("  Configurando permisos"))
+                print(Colors.info("  Instalando/actualizando dependencias"))
             
-            # Configurar permisos en update_dir (código actualizado)
-            self._set_permissions(update_dir)
-            
-            # Si es Next.js, también configurar permisos en app_dir (donde está el build)
-            if app_config.app_type == "nextjs":
-                self._set_permissions(app_dir)
-
-            # Paso 6: Crear backup de la versión actual antes del intercambio
-            if self.verbose:
-                print(Colors.info("  Creando backup de versión actual"))
-            if backup_dir.exists():
-                shutil.rmtree(backup_dir)
-            
-            # Aquí la aplicación actual sigue corriendo
-            if self.verbose:
-                print(Colors.info("  La aplicación actual sigue funcionando..."))
-            
-            # Paso 7: Intercambio selectivo - actualizar solo código y build, preservar node_modules
-            # Este es el único momento donde podría haber un breve downtime
-            if self.verbose:
-                print(Colors.info("  Realizando actualización selectiva de archivos"))
-            
-            try:
-                # Crear backup antes del intercambio
-                shutil.move(str(app_dir), str(backup_dir))
-                
-                # Crear nuevo directorio de app
-                app_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Copiar todo desde update_dir excepto los directorios que vamos a preservar
-                if self.verbose:
-                    print(Colors.info("  Copiando código actualizado..."))
-                
-                for item in update_dir.iterdir():
-                    dest = app_dir / item.name
-                    if item.is_dir():
-                        shutil.copytree(item, dest)
-                    else:
-                        shutil.copy2(item, dest)
-                
-                # Si es Next.js, copiar .next desde el backup (ya fue construido en el paso anterior)
-                if app_config.app_type == "nextjs":
-                    backup_next = backup_dir / ".next"
-                    app_next = app_dir / ".next"
-                    if backup_next.exists():
-                        if self.verbose:
-                            print(Colors.info("  Copiando build .next actualizado..."))
-                        shutil.copytree(backup_next, app_next)
-                
-                # Preservar node_modules del backup (mantener enlaces simbólicos intactos)
-                if app_config.app_type in ["nextjs", "node"]:
-                    backup_node_modules = backup_dir / "node_modules"
-                    app_node_modules = app_dir / "node_modules"
-                    if backup_node_modules.exists():
-                        if self.verbose:
-                            print(Colors.info("  Preservando node_modules con enlaces simbólicos..."))
-                        # Mover (no copiar) para mantener enlaces simbólicos intactos
-                        shutil.move(str(backup_node_modules), str(app_node_modules))
-                
-                # Preservar .venv para FastAPI
-                if app_config.app_type == "fastapi":
-                    backup_venv = backup_dir / ".venv"
-                    app_venv = app_dir / ".venv"
-                    if backup_venv.exists():
-                        if self.verbose:
-                            print(Colors.info("  Preservando entorno virtual Python..."))
-                        shutil.move(str(backup_venv), str(app_venv))
-                
-                if self.verbose:
-                    print(Colors.success("  ✓ Actualización selectiva completada exitosamente"))
-            except Exception as e:
-                print(Colors.error(f"Error en actualización de directorios: {e}"))
-                # Intentar revertir si falla
-                if backup_dir.exists() and app_dir.exists():
+            if not self._update_dependencies_in_place(app_dir, app_config):
+                print(Colors.error("Error actualizando dependencias"))
+                # Revertir desde backup
+                if backup_dir.exists():
                     shutil.rmtree(app_dir)
-                    shutil.move(str(backup_dir), str(app_dir))
-                if update_dir.exists():
-                    shutil.rmtree(update_dir)
+                    shutil.copytree(backup_dir, app_dir)
+                    print(Colors.info("Aplicación revertida desde backup"))
                 return False
 
-            # Paso 8: Limpiar directorios temporales después del intercambio exitoso
-            if update_dir.exists():
+            # Paso 6: Detectar y ejecutar Prisma Generate si es necesario
+            if self._has_prisma(app_dir):
                 if self.verbose:
-                    print(Colors.info("  Limpiando directorio temporal de actualización..."))
-                shutil.rmtree(update_dir)
-            
-            # El backup se mantiene por si necesitamos rollback manual
+                    print(Colors.info("  Prisma detectado, ejecutando prisma generate"))
+                if not self._run_prisma_generate(app_dir, app_config):
+                    print(Colors.warning("Error ejecutando prisma generate, continuando..."))
+
+            # Paso 7: Hacer build en la misma carpeta
             if self.verbose:
-                print(Colors.info(f"  Backup mantenido en: {backup_dir}"))
-                print(Colors.success("  Actualización completada con zero-downtime"))
+                print(Colors.info("  Construyendo aplicación"))
+            
+            if not self._build_in_place(app_dir, app_config):
+                print(Colors.error("Error construyendo aplicación"))
+                # Revertir desde backup
+                if backup_dir.exists():
+                    shutil.rmtree(app_dir)
+                    shutil.copytree(backup_dir, app_dir)
+                    print(Colors.info("Aplicación revertida desde backup"))
+                return False
+
+            # Paso 8: Configurar permisos finales
+            if self.verbose:
+                print(Colors.info("  Configurando permisos finales"))
+            self._set_permissions(app_dir)
+
+            # Paso 9: Limpiar backup si todo salió bien
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+                if self.verbose:
+                    print(Colors.info("  Backup temporal eliminado"))
+
+            if self.verbose:
+                print(Colors.success("  ✓ Actualización completada exitosamente"))
             
             return True
 
@@ -346,12 +259,14 @@ class AppService:
                 import traceback
                 print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
             
-            # Limpiar directorios temporales
-            if update_dir.exists():
-                try:
-                    shutil.rmtree(update_dir)
-                except:
-                    pass
+            # Intentar revertir desde backup
+            try:
+                if backup_dir.exists() and app_dir.exists():
+                    shutil.rmtree(app_dir)
+                    shutil.copytree(backup_dir, app_dir)
+                    print(Colors.info("Aplicación revertida desde backup"))
+            except:
+                print(Colors.error("Error al intentar revertir desde backup"))
             
             return False
 
@@ -1130,6 +1045,225 @@ class AppService:
         
         if self.verbose:
             print(Colors.success("  Permisos configurados (rápido)"))
+
+    def _update_dependencies_in_place(self, app_dir: Path, app_config: AppConfig) -> bool:
+        """Actualizar dependencias directamente en la carpeta de la aplicación"""
+        try:
+            if app_config.app_type in ["nextjs", "nodejs"]:
+                print(Colors.info("📦 Actualizando dependencias npm..."))
+                
+                # Usar npm install para actualizar dependencias
+                install_result = self.cmd.run(
+                    f"cd {app_dir} && npm install --production=false",
+                    check=False
+                )
+                
+                if not install_result:
+                    print(Colors.error("❌ Error actualizando dependencias npm"))
+                    return False
+                
+                node_modules = app_dir / "node_modules"
+                if not node_modules.exists():
+                    print(Colors.error("❌ node_modules no existe"))
+                    return False
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Dependencias npm actualizadas"))
+                
+            elif app_config.app_type == "fastapi":
+                print(Colors.info("🐍 Actualizando dependencias Python..."))
+                
+                venv_dir = app_dir / ".venv"
+                requirements_file = app_dir / "requirements.txt"
+                
+                # Si no existe venv, crearlo
+                if not venv_dir.exists():
+                    print(Colors.info("  Creando entorno virtual..."))
+                    venv_result = self.cmd.run(f"cd {app_dir} && python3 -m venv .venv", check=False)
+                    if not venv_result:
+                        print(Colors.error("❌ Error creando entorno virtual"))
+                        return False
+                
+                # Actualizar pip
+                self.cmd.run(f"cd {app_dir} && .venv/bin/pip install --upgrade pip", check=False)
+                
+                # Instalar/actualizar dependencias
+                if requirements_file.exists():
+                    install_deps = self.cmd.run(
+                        f"cd {app_dir} && .venv/bin/pip install -r requirements.txt",
+                        check=False,
+                    )
+                    if not install_deps:
+                        print(Colors.error("❌ Error actualizando dependencias de Python"))
+                        return False
+                else:
+                    install_basic = self.cmd.run(
+                        f"cd {app_dir} && .venv/bin/pip install fastapi uvicorn[standard]",
+                        check=False,
+                    )
+                    if not install_basic:
+                        print(Colors.error("❌ Error instalando dependencias básicas"))
+                        return False
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Dependencias Python actualizadas"))
+            
+            return True
+            
+        except Exception as e:
+            print(Colors.error(f"❌ Error actualizando dependencias: {e}"))
+            return False
+
+    def _has_prisma(self, app_dir: Path) -> bool:
+        """Detectar si el proyecto usa Prisma"""
+        prisma_paths = [
+            app_dir / "prisma" / "schema.prisma",
+            app_dir / "schema.prisma",
+        ]
+        
+        for path in prisma_paths:
+            if path.exists():
+                if self.verbose:
+                    print(Colors.info(f"  ✓ Prisma schema encontrado: {path}"))
+                return True
+        
+        # También verificar en package.json
+        package_json = app_dir / "package.json"
+        if package_json.exists():
+            try:
+                with open(package_json, "r") as f:
+                    package_data = json.load(f)
+                    dependencies = {
+                        **package_data.get("dependencies", {}),
+                        **package_data.get("devDependencies", {}),
+                    }
+                    if "@prisma/client" in dependencies or "prisma" in dependencies:
+                        if self.verbose:
+                            print(Colors.info("  ✓ Prisma detectado en package.json"))
+                        return True
+            except:
+                pass
+        
+        return False
+
+    def _run_prisma_generate(self, app_dir: Path, app_config: AppConfig) -> bool:
+        """Ejecutar prisma generate"""
+        try:
+            print(Colors.info("🔄 Ejecutando prisma generate..."))
+            
+            # Verificar que node_modules existe
+            node_modules = app_dir / "node_modules"
+            if not node_modules.exists():
+                print(Colors.warning("node_modules no encontrado, instalando dependencias primero..."))
+                install_result = self.cmd.run(
+                    f"cd {app_dir} && npm install",
+                    check=False
+                )
+                if not install_result:
+                    return False
+            
+            # Ejecutar prisma generate
+            prisma_result = self.cmd.run(
+                f"cd {app_dir} && npx prisma generate",
+                check=False
+            )
+            
+            if not prisma_result:
+                print(Colors.error("❌ Error ejecutando prisma generate"))
+                return False
+            
+            if self.verbose:
+                print(Colors.success("  ✓ Prisma generate completado"))
+            
+            return True
+            
+        except Exception as e:
+            print(Colors.error(f"❌ Error ejecutando prisma generate: {e}"))
+            return False
+
+    def _build_in_place(self, app_dir: Path, app_config: AppConfig) -> bool:
+        """Construir aplicación directamente en su carpeta"""
+        try:
+            if app_config.app_type == "nextjs":
+                print(Colors.info("🔨 Construyendo aplicación Next.js..."))
+                
+                # Limpiar .next si existe
+                next_cache = app_dir / ".next"
+                if next_cache.exists():
+                    shutil.rmtree(next_cache)
+                
+                # Configurar permisos antes del build
+                node_modules_bin = app_dir / "node_modules" / ".bin"
+                if node_modules_bin.exists():
+                    self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+                
+                # Construir con variables de entorno
+                build_cmd = app_config.build_command or "npm run build"
+                env_vars = "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1"
+                
+                build_result = self.cmd.run(
+                    f"cd {app_dir} && {env_vars} {build_cmd}",
+                    check=False
+                )
+                
+                if not build_result:
+                    print(Colors.error("❌ Error construyendo Next.js"))
+                    return False
+                
+                # Verificar que .next se creó
+                if not next_cache.exists():
+                    print(Colors.error("❌ Build no generó directorio .next"))
+                    return False
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Build Next.js completado"))
+                
+            elif app_config.app_type == "nodejs":
+                # Node.js puede tener script de build opcional
+                package_json = app_dir / "package.json"
+                if package_json.exists():
+                    try:
+                        with open(package_json, "r") as f:
+                            package_data = json.load(f)
+                        
+                        scripts = package_data.get("scripts", {})
+                        if "build" in scripts:
+                            print(Colors.info("🔨 Ejecutando build script..."))
+                            build_result = self.cmd.run(
+                                f"cd {app_dir} && npm run build",
+                                check=False
+                            )
+                            if not build_result:
+                                print(Colors.error("❌ Error ejecutando build"))
+                                return False
+                            if self.verbose:
+                                print(Colors.success("  ✓ Build completado"))
+                        else:
+                            if self.verbose:
+                                print(Colors.info("  No hay script de build, omitiendo"))
+                    except:
+                        pass
+            
+            elif app_config.app_type == "fastapi":
+                # FastAPI no requiere build, solo validar
+                print(Colors.info("🐍 Validando aplicación FastAPI..."))
+                main_file = app_dir / "main.py"
+                if main_file.exists():
+                    syntax_check = self.cmd.run(
+                        f"cd {app_dir} && .venv/bin/python -m py_compile main.py",
+                        check=False
+                    )
+                    if not syntax_check:
+                        print(Colors.error("❌ Error de sintaxis en main.py"))
+                        return False
+                    if self.verbose:
+                        print(Colors.success("  ✓ Validación completada"))
+            
+            return True
+            
+        except Exception as e:
+            print(Colors.error(f"❌ Error construyendo aplicación: {e}"))
+            return False
 
     def _configure_git_safe_directory(self, directory: Path):
         """Configurar directorio como seguro para Git"""
