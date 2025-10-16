@@ -174,8 +174,9 @@ class AppService:
 
             # Paso 2: Configurar permisos para Git
             if self.verbose:
-                print(Colors.info("  Configurando permisos"))
-            self.cmd.run_sudo(f"chown -R root:root {app_dir}")
+                print(Colors.info("  Configurando permisos para Git"))
+            # Solo cambiar propietario del directorio raíz para Git
+            self.cmd.run_sudo(f"chown root:root {app_dir}", check=False)
             self._configure_git_safe_directory(app_dir)
             
             try:
@@ -200,7 +201,8 @@ class AppService:
             # Paso 4: Reconstruir aplicación
             if self.verbose:
                 print(Colors.info("  Reconstruyendo aplicación"))
-            self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
+            # Cambiar propietario solo del directorio raíz para el build
+            self.cmd.run_sudo(f"chown www-data:www-data {app_dir}", check=False)
             
             if not self._rebuild_application(app_dir, app_config):
                 print(Colors.error("Error reconstruyendo aplicación"))
@@ -781,22 +783,49 @@ class AppService:
             return False
 
     def _set_permissions(self, app_dir: Path):
-        """Configurar permisos de directorio"""
-        self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}")
-        self.cmd.run_sudo(f"find {app_dir} -type f -exec chmod 644 {{}} \\;")
-        self.cmd.run_sudo(f"find {app_dir} -type d -exec chmod 755 {{}} \\;")
+        """Configurar permisos de directorio de forma optimizada"""
+        # Solo cambiar el propietario del directorio raíz y directorios críticos
+        # Los archivos en node_modules, .next, dist, etc. no necesitan cambios
         
-        # Dar permisos de ejecución a archivos en node_modules/.bin/
+        if self.verbose:
+            print(Colors.info("  Configurando permisos (optimizado)..."))
+        
+        # Cambiar propietario del directorio raíz solamente
+        self.cmd.run_sudo(f"chown www-data:www-data {app_dir}", check=False)
+        
+        # Cambiar propietario solo de directorios críticos, no recursivamente en todo
+        critical_dirs = [
+            "public",
+            "static",
+            ".next",
+            "dist",
+            "build",
+            "out",
+            ".output"  # Para Nuxt/Nitro
+        ]
+        
+        for dir_name in critical_dirs:
+            dir_path = app_dir / dir_name
+            if dir_path.exists():
+                # Solo chown en el directorio, los archivos internos ya tienen permisos correctos
+                self.cmd.run_sudo(f"chown -R www-data:www-data {dir_path}", check=False)
+        
+        # Configurar permisos de ejecución solo donde es necesario
         node_modules_bin = app_dir / "node_modules" / ".bin"
         if node_modules_bin.exists():
-            self.cmd.run_sudo(f"chmod +x {node_modules_bin}/*")
-            print(Colors.info("Permisos de ejecución configurados para node_modules/.bin/"))
+            self.cmd.run_sudo(f"chmod -R +x {node_modules_bin}", check=False)
+            if self.verbose:
+                print(Colors.info("  Permisos de ejecución para node_modules/.bin/"))
         
-        # Dar permisos de ejecución a archivos en .venv/bin/ (para FastAPI)
+        # Para aplicaciones Python (FastAPI)
         venv_bin = app_dir / ".venv" / "bin"
         if venv_bin.exists():
-            self.cmd.run_sudo(f"chmod +x {venv_bin}/*")
-            print(Colors.info("Permisos de ejecución configurados para .venv/bin/"))
+            self.cmd.run_sudo(f"chmod -R +x {venv_bin}", check=False)
+            if self.verbose:
+                print(Colors.info("  Permisos de ejecución para .venv/bin/"))
+        
+        if self.verbose:
+            print(Colors.success("  Permisos configurados (rápido)"))
 
     def _configure_git_safe_directory(self, directory: Path):
         """Configurar directorio como seguro para Git"""

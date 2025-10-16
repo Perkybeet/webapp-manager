@@ -129,9 +129,17 @@ class BaseDeployer(ABC):
         pass
     
     def set_permissions(self, app_dir: Path):
-        """Configurar permisos de la aplicación"""
-        self.cmd.run(f"chown -R www-data:www-data {app_dir}", check=False)
-        self.cmd.run(f"chmod -R 755 {app_dir}", check=False)
+        """Configurar permisos de la aplicación de forma optimizada"""
+        # Solo cambiar propietario del directorio raíz
+        # Los archivos dentro ya tienen permisos correctos del build
+        self.cmd.run(f"chown www-data:www-data {app_dir}", check=False)
+        
+        # Cambiar propietario solo de directorios de salida críticos
+        critical_dirs = ["public", "static", ".next", "dist", "build", "out", ".output"]
+        for dir_name in critical_dirs:
+            dir_path = app_dir / dir_name
+            if dir_path.exists():
+                self.cmd.run(f"chown -R www-data:www-data {dir_path}", check=False)
     
     def check_requirements(self) -> bool:
         """Verificar que los requerimientos del sistema estén instalados"""
