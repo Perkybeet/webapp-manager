@@ -167,14 +167,29 @@ class AppService:
                     print(Colors.error(error_msg))
                 return False
 
-            # Paso 1: Crear copia de trabajo para actualización
+            # Paso 1: Crear copia de trabajo para actualización (excluyendo node_modules y otros)
             if self.verbose:
-                print(Colors.info("  Creando copia de trabajo para actualización"))
+                print(Colors.info("  Creando copia de trabajo para actualización (sin node_modules)"))
             if update_dir.exists():
                 shutil.rmtree(update_dir)
-            shutil.copytree(app_dir, update_dir)
+            
+            # Copiar excluyendo directorios problemáticos con enlaces simbólicos
+            def ignore_patterns(directory, contents):
+                """Ignorar node_modules y otros directorios con enlaces simbólicos"""
+                ignore = set()
+                if 'node_modules' in contents:
+                    ignore.add('node_modules')
+                if '.next' in contents:
+                    ignore.add('.next')
+                if '.venv' in contents:
+                    ignore.add('.venv')
+                if '__pycache__' in contents:
+                    ignore.add('__pycache__')
+                return ignore
+            
+            shutil.copytree(app_dir, update_dir, ignore=ignore_patterns)
             if self.verbose:
-                print(Colors.success(f"  Copia de trabajo creada: {update_dir}"))
+                print(Colors.success(f"  Copia de trabajo creada (sin enlaces simbólicos): {update_dir}"))
 
             # Paso 2: Configurar permisos para Git en la copia
             if self.verbose:
@@ -202,21 +217,42 @@ class AppService:
             if used_branch != app_config.branch:
                 print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
 
-            # Paso 4: Reconstruir aplicación en la copia
+            # Paso 4: Reconstruir aplicación
+            # Para Next.js: hacer build en la carpeta original para evitar problemas con rutas
+            # Para otros: reconstruir en la copia
             if self.verbose:
-                print(Colors.info("  Reconstruyendo aplicación en copia temporal"))
+                if app_config.app_type == "nextjs":
+                    print(Colors.info("  Construyendo Next.js en carpeta original (evitando problemas de rutas)"))
+                else:
+                    print(Colors.info("  Reconstruyendo aplicación en copia temporal"))
+            
             self.cmd.run_sudo(f"chown www-data:www-data {update_dir}", check=False)
             
-            if not self._rebuild_application(update_dir, app_config):
-                print(Colors.error("Error reconstruyendo aplicación"))
-                if update_dir.exists():
-                    shutil.rmtree(update_dir)
-                return False
+            if app_config.app_type == "nextjs":
+                # Para Next.js: actualizar dependencias y hacer build en carpeta ORIGINAL
+                if not self._rebuild_nextjs_in_place(app_dir, app_config):
+                    print(Colors.error("Error construyendo aplicación Next.js"))
+                    if update_dir.exists():
+                        shutil.rmtree(update_dir)
+                    return False
+            else:
+                # Para otros tipos: reconstruir en la copia temporal
+                if not self._rebuild_application(update_dir, app_config):
+                    print(Colors.error("Error reconstruyendo aplicación"))
+                    if update_dir.exists():
+                        shutil.rmtree(update_dir)
+                    return False
 
-            # Paso 5: Configurar permisos en la copia actualizada
+            # Paso 5: Configurar permisos
             if self.verbose:
-                print(Colors.info("  Configurando permisos en nueva versión"))
+                print(Colors.info("  Configurando permisos"))
+            
+            # Configurar permisos en update_dir (código actualizado)
             self._set_permissions(update_dir)
+            
+            # Si es Next.js, también configurar permisos en app_dir (donde está el build)
+            if app_config.app_type == "nextjs":
+                self._set_permissions(app_dir)
 
             # Paso 6: Crear backup de la versión actual antes del intercambio
             if self.verbose:
@@ -228,29 +264,75 @@ class AppService:
             if self.verbose:
                 print(Colors.info("  La aplicación actual sigue funcionando..."))
             
-            # Paso 7: Intercambio atómico - mover actual a backup y update a actual
+            # Paso 7: Intercambio selectivo - actualizar solo código y build, preservar node_modules
             # Este es el único momento donde podría haber un breve downtime
             if self.verbose:
-                print(Colors.info("  Realizando intercambio atómico de directorios"))
+                print(Colors.info("  Realizando actualización selectiva de archivos"))
             
             try:
-                # Mover actual a backup
+                # Crear backup antes del intercambio
                 shutil.move(str(app_dir), str(backup_dir))
-                # Mover update a actual
-                shutil.move(str(update_dir), str(app_dir))
+                
+                # Crear nuevo directorio de app
+                app_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Copiar todo desde update_dir excepto los directorios que vamos a preservar
+                if self.verbose:
+                    print(Colors.info("  Copiando código actualizado..."))
+                
+                for item in update_dir.iterdir():
+                    dest = app_dir / item.name
+                    if item.is_dir():
+                        shutil.copytree(item, dest)
+                    else:
+                        shutil.copy2(item, dest)
+                
+                # Si es Next.js, copiar .next desde el backup (ya fue construido en el paso anterior)
+                if app_config.app_type == "nextjs":
+                    backup_next = backup_dir / ".next"
+                    app_next = app_dir / ".next"
+                    if backup_next.exists():
+                        if self.verbose:
+                            print(Colors.info("  Copiando build .next actualizado..."))
+                        shutil.copytree(backup_next, app_next)
+                
+                # Preservar node_modules del backup (mantener enlaces simbólicos intactos)
+                if app_config.app_type in ["nextjs", "node"]:
+                    backup_node_modules = backup_dir / "node_modules"
+                    app_node_modules = app_dir / "node_modules"
+                    if backup_node_modules.exists():
+                        if self.verbose:
+                            print(Colors.info("  Preservando node_modules con enlaces simbólicos..."))
+                        # Mover (no copiar) para mantener enlaces simbólicos intactos
+                        shutil.move(str(backup_node_modules), str(app_node_modules))
+                
+                # Preservar .venv para FastAPI
+                if app_config.app_type == "fastapi":
+                    backup_venv = backup_dir / ".venv"
+                    app_venv = app_dir / ".venv"
+                    if backup_venv.exists():
+                        if self.verbose:
+                            print(Colors.info("  Preservando entorno virtual Python..."))
+                        shutil.move(str(backup_venv), str(app_venv))
                 
                 if self.verbose:
-                    print(Colors.success("  ✓ Intercambio completado exitosamente"))
+                    print(Colors.success("  ✓ Actualización selectiva completada exitosamente"))
             except Exception as e:
-                print(Colors.error(f"Error en intercambio de directorios: {e}"))
+                print(Colors.error(f"Error en actualización de directorios: {e}"))
                 # Intentar revertir si falla
-                if backup_dir.exists() and not app_dir.exists():
+                if backup_dir.exists() and app_dir.exists():
+                    shutil.rmtree(app_dir)
                     shutil.move(str(backup_dir), str(app_dir))
                 if update_dir.exists():
                     shutil.rmtree(update_dir)
                 return False
 
-            # Paso 8: Limpiar backup después de verificación exitosa
+            # Paso 8: Limpiar directorios temporales después del intercambio exitoso
+            if update_dir.exists():
+                if self.verbose:
+                    print(Colors.info("  Limpiando directorio temporal de actualización..."))
+                shutil.rmtree(update_dir)
+            
             # El backup se mantiene por si necesitamos rollback manual
             if self.verbose:
                 print(Colors.info(f"  Backup mantenido en: {backup_dir}"))
@@ -884,6 +966,102 @@ class AppService:
 
         except Exception as e:
             print(Colors.error(f"❌ Error reconstruyendo aplicación: {e}"))
+            if self.verbose:
+                import traceback
+                print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
+            return False
+
+    def _rebuild_nextjs_in_place(self, app_dir: Path, app_config: AppConfig) -> bool:
+        """
+        Reconstruir aplicación Next.js directamente en su carpeta (sin mover node_modules)
+        
+        Este método se usa durante actualizaciones para construir la nueva versión
+        sin tener problemas con enlaces simbólicos en node_modules.
+        """
+        try:
+            print(Colors.info("🧹 Preparando actualización de Next.js..."))
+            
+            next_cache = app_dir / ".next"
+            package_lock = app_dir / "package-lock.json"
+            
+            # Eliminar .next si existe (cache de Next.js antiguo)
+            if next_cache.exists():
+                if self.verbose:
+                    print(Colors.info("  Eliminando caché .next anterior..."))
+                shutil.rmtree(next_cache)
+            
+            # NO eliminamos node_modules ni package-lock.json para preservar enlaces simbólicos
+            # Solo actualizamos las dependencias si hay cambios en package.json
+            
+            print(Colors.info("📦 Actualizando dependencias npm (preservando enlaces)..."))
+            # Usar npm install que actualizará solo lo necesario
+            install_result = self.cmd.run(
+                f"cd {app_dir} && npm install --production=false",
+                check=False
+            )
+            
+            if not install_result:
+                print(Colors.error("❌ Error actualizando dependencias npm"))
+                return False
+            
+            node_modules = app_dir / "node_modules"
+            if not node_modules.exists():
+                print(Colors.error("❌ node_modules no existe después de npm install"))
+                return False
+            
+            if self.verbose:
+                print(Colors.success("  ✓ Dependencias actualizadas correctamente"))
+
+            # Hacer build de Next.js
+            print(Colors.info("🔨 Construyendo aplicación Next.js..."))
+            
+            # Configurar permisos antes del build
+            node_modules_bin = app_dir / "node_modules" / ".bin"
+            if node_modules_bin.exists():
+                self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+                if self.verbose:
+                    print(Colors.info("  Permisos configurados para node_modules/.bin/"))
+            
+            # Construir con variables de entorno necesarias
+            build_cmd = app_config.build_command or "npm run build"
+            env_vars = "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1"
+            
+            build_result = self.cmd.run(
+                f"cd {app_dir} && {env_vars} {build_cmd}",
+                check=False
+            )
+            
+            if not build_result:
+                print(Colors.error("❌ Error construyendo aplicación Next.js"))
+                return False
+            
+            # Verificar que .next se creó
+            if not next_cache.exists():
+                print(Colors.error("❌ Build no generó directorio .next"))
+                return False
+            
+            # Verificar archivos críticos del build
+            build_id = next_cache / "BUILD_ID"
+            
+            if not build_id.exists():
+                print(Colors.warning("⚠️  BUILD_ID no encontrado, generando..."))
+                import uuid
+                build_id.write_text(str(uuid.uuid4())[:8])
+            
+            if self.verbose:
+                print(Colors.success("  ✓ Build completado exitosamente"))
+            
+            # Configurar permisos finales de ejecución
+            if node_modules_bin.exists():
+                self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+                if self.verbose:
+                    print(Colors.info("  Permisos finales configurados"))
+
+            print(Colors.success("✅ Aplicación Next.js reconstruida exitosamente"))
+            return True
+
+        except Exception as e:
+            print(Colors.error(f"❌ Error reconstruyendo Next.js: {e}"))
             if self.verbose:
                 import traceback
                 print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
