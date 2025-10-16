@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="15">
     <title>Servicio Temporalmente No Disponible</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         * {
             margin: 0;
@@ -69,26 +71,11 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
-        .icon svg {
-            width: 48px;
-            height: 48px;
-            stroke: white;
-            stroke-width: 2;
-            fill: none;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-                box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
-            }
-            50% {
-                transform: scale(1.05);
-                box-shadow: 0 15px 50px rgba(239, 68, 68, 0.6);
-            }
+        .icon i {
+            font-size: 48px;
+            color: white;
         }
 
         .error-code {
@@ -130,30 +117,6 @@
             line-height: 1.6;
         }
 
-        .retry-info {
-            font-size: 0.8125rem;
-            color: #64748b;
-            margin-top: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .retry-info::before {
-            content: '';
-            width: 6px;
-            height: 6px;
-            background: #64748b;
-            border-radius: 50%;
-            animation: blink 2s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
-        }
-
         @media (max-width: 640px) {
             .container {
                 padding: 2.5rem 1.5rem;
@@ -173,11 +136,7 @@
     <div class="container">
         <div class="icon-container">
             <div class="icon">
-                <svg viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
+                <i class="fas fa-exclamation-circle"></i>
             </div>
         </div>
         
@@ -192,14 +151,6 @@
         <div class="message">
             Nuestro equipo técnico está trabajando para resolver este problema lo antes posible.
         </div>
-        
-        <p class="retry-info">
-            Actualización automática en 30 segundos
-        </p>
     </div>
-
-    <script>
-        setTimeout(() => window.location.reload(), 30000);
-    </script>
 </body>
 </html>

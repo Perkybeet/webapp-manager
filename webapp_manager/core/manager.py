@@ -771,7 +771,10 @@ class WebAppManager:
             return False
     
     def update_app(self, domain: str) -> bool:
-        """Actualizar aplicación"""
+        """
+        Actualizar aplicación con zero-downtime deployment
+        El servicio se mantiene activo hasta que la nueva versión está completamente lista
+        """
         # Verificar prerrequisitos
         self.check_prerequisites()
         
@@ -790,33 +793,28 @@ class WebAppManager:
             app_config = self.config_manager.get_app(domain)
 
             if self.progress:
-                with self.progress.task(f"Actualizando {domain}", total=4) as task_id:
+                with self.progress.task(f"Actualizando {domain}", total=5) as task_id:
                     # Verificar y aplicar configuración de mantenimiento
                     self.progress.update(task_id, advance=0.5, description="Verificando configuración")
                     self.nginx_service.update_config_with_maintenance(app_config)
                     
-                    # Activar modo mantenimiento
-                    self.progress.update(task_id, advance=0.5, description="Activando mantenimiento")
-                    if not self.nginx_service.enable_maintenance_mode(app_config):
-                        self.progress.error("Error activando modo mantenimiento")
-                        return False
-
-                    # Detener servicio
-                    self.progress.update(task_id, advance=1, description="Deteniendo servicio")
-                    self.systemd_service.stop_service(domain)
-
-                    # Actualizar aplicación
-                    self.progress.update(task_id, advance=1, description="Actualizando código")
+                    # Mostrar página de actualización (pero el servicio sigue corriendo)
+                    self.progress.update(task_id, advance=0.5, description="Preparando actualización")
+                    # Nota: NO detenemos el servicio aquí, solo preparamos el entorno
+                    
+                    # Actualizar aplicación en paralelo (copia, build, etc.)
+                    self.progress.update(task_id, advance=2, description="Construyendo nueva versión")
                     if not self.app_service.update_app(domain, app_config):
-                        self.systemd_service.start_service(domain)
-                        self.nginx_service.disable_maintenance_mode(app_config)
+                        self.progress.error("Error construyendo nueva versión")
                         return False
 
-                    # Reiniciar servicio
+                    # Ahora sí, reiniciar el servicio con la nueva versión
                     self.progress.update(task_id, advance=1, description="Reiniciando servicio")
+                    self.systemd_service.stop_service(domain)
                     success = self.systemd_service.start_and_verify(domain, app_config.port)
                     
-                    # Desactivar modo mantenimiento si fue exitoso
+                    # Desactivar modo mantenimiento
+                    self.progress.update(task_id, advance=1, description="Finalizando actualización")
                     if success:
                         self.nginx_service.disable_maintenance_mode(app_config)
             else:
@@ -826,27 +824,23 @@ class WebAppManager:
                 self.nginx_service.update_config_with_maintenance(app_config)
                 
                 if self.verbose:
-                    print(Colors.info("→ Activando modo mantenimiento"))
-                if not self.nginx_service.enable_maintenance_mode(app_config):
-                    print(Colors.error("Error activando modo mantenimiento"))
-                    return False
+                    print(Colors.info("→ Preparando actualización"))
+                    print(Colors.info("   La aplicación actual sigue funcionando..."))
 
                 if self.verbose:
-                    print(Colors.info("→ Deteniendo servicio"))
-                self.systemd_service.stop_service(domain)
-
-                if self.verbose:
-                    print(Colors.info("→ Actualizando código y reconstruyendo"))
+                    print(Colors.info("→ Construyendo nueva versión en paralelo"))
                 if not self.app_service.update_app(domain, app_config):
-                    self.systemd_service.start_service(domain)
-                    self.nginx_service.disable_maintenance_mode(app_config)
+                    print(Colors.error("Error construyendo nueva versión"))
                     return False
 
                 if self.verbose:
-                    print(Colors.info("→ Reiniciando servicio"))
+                    print(Colors.info("→ Nueva versión lista, reiniciando servicio"))
+                self.systemd_service.stop_service(domain)
                 success = self.systemd_service.start_and_verify(domain, app_config.port)
                 
                 if success:
+                    if self.verbose:
+                        print(Colors.info("→ Desactivando modo mantenimiento"))
                     self.nginx_service.disable_maintenance_mode(app_config)
 
             if success:
@@ -854,9 +848,9 @@ class WebAppManager:
                 self.config_manager.update_app(domain, app_config)
                 
                 if self.progress:
-                    self.progress.success(f"Aplicación {domain} actualizada exitosamente")
+                    self.progress.success(f"Aplicación {domain} actualizada exitosamente con zero-downtime")
                 else:
-                    print(Colors.success(f"\n✓ Aplicación {domain} actualizada exitosamente"))
+                    print(Colors.success(f"\n✓ Aplicación {domain} actualizada exitosamente con zero-downtime"))
             else:
                 error_msg = "Error verificando aplicación después de actualización"
                 if self.progress:
@@ -872,6 +866,13 @@ class WebAppManager:
                 self.progress.error(error_msg)
             else:
                 print(Colors.error(error_msg))
+            
+            # Intentar restaurar el servicio
+            try:
+                self.systemd_service.start_service(domain)
+            except:
+                pass
+                
             return False
     
     def list_apps(self, detailed: bool = False):

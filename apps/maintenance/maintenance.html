@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="15">
     <title>Mantenimiento Programado</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         * {
             margin: 0;
@@ -71,18 +73,9 @@
             box-shadow: 0 10px 40px rgba(251, 146, 60, 0.4);
         }
 
-        .icon svg {
-            width: 48px;
-            height: 48px;
-            stroke: white;
-            stroke-width: 2;
-            fill: none;
-            animation: rotate-gear 4s linear infinite;
-        }
-
-        @keyframes rotate-gear {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .icon i {
+            font-size: 48px;
+            color: white;
         }
 
         .status-badge {
@@ -113,57 +106,11 @@
             font-weight: 400;
         }
 
-        .maintenance-info {
-            background: rgba(251, 146, 60, 0.05);
-            border: 1px solid rgba(251, 146, 60, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin: 2rem 0;
-            text-align: left;
-        }
-
-        .maintenance-info h3 {
-            color: #fdba74;
-            margin-bottom: 0.75rem;
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        .maintenance-info p {
-            color: #cbd5e1;
-            font-size: 0.875rem;
-            line-height: 1.6;
-        }
-
         .message {
             font-size: 0.875rem;
             color: #cbd5e1;
             margin-top: 2rem;
             line-height: 1.6;
-        }
-
-        .retry-info {
-            font-size: 0.8125rem;
-            color: #64748b;
-            margin-top: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .retry-info::before {
-            content: '';
-            width: 6px;
-            height: 6px;
-            background: #64748b;
-            border-radius: 50%;
-            animation: blink 2s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
         }
 
         @media (max-width: 640px) {
@@ -185,10 +132,7 @@
     <div class="container">
         <div class="icon-container">
             <div class="icon">
-                <svg viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M12 1v6m0 6v6m10-11h-6m-6 0H1m16.364 12.364l-4.243-4.243m-6.364 0L2.636 18.364m15.556-15.556l-4.243 4.243m-6.364 0L2.636 2.636"></path>
-                </svg>
+                <i class="fas fa-wrench"></i>
             </div>
         </div>
         
@@ -199,23 +143,10 @@
         <p class="subtitle">
             Estamos realizando tareas de mantenimiento para mejorar nuestros servicios.
         </p>
-        
-        <div class="maintenance-info">
-            <h3>Información del Mantenimiento</h3>
-            <p>Durante este periodo, el servicio no estará disponible. Estimamos que el mantenimiento tomará aproximadamente 15-30 minutos.</p>
-        </div>
 
         <p class="message">
             Gracias por tu paciencia. El servicio se restablecerá automáticamente una vez finalizado el mantenimiento.
         </p>
-        
-        <p class="retry-info">
-            Actualización automática en 60 segundos
-        </p>
     </div>
-
-    <script>
-        setTimeout(() => window.location.reload(), 60000);
-    </script>
 </body>
 </html>

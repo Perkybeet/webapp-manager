@@ -158,13 +158,8 @@ class NginxService:
     def enable_maintenance_mode(self, app_config: AppConfig) -> bool:
         """Activar modo mantenimiento para una aplicación"""
         try:
-            # Crear directorio de mantenimiento si no existe
-            maintenance_dir = Path("/var/www/maintenance")
-            maintenance_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Copiar template de mantenimiento
-            template_path = Path(__file__).parent.parent / "templates" / "maintenance.html"
-            shutil.copy2(template_path, maintenance_dir / "index.html")
+            # Asegurar que el directorio de mantenimiento existe
+            self.ensure_maintenance_directory()
             
             # Leer la configuración actual para preservar SSL si existe
             config_path = self.nginx_sites / app_config.domain

@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="15">
     <title>Actualizando Aplicación</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         * {
             margin: 0;
@@ -69,33 +71,11 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
-        .icon::before {
-            content: '';
-            width: 44px;
-            height: 44px;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-top: 3px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-                box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
-            }
-            50% {
-                transform: scale(1.05);
-                box-shadow: 0 15px 50px rgba(99, 102, 241, 0.6);
-            }
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .icon i {
+            font-size: 48px;
+            color: white;
         }
 
         .status-badge {
@@ -141,7 +121,7 @@
             background: linear-gradient(90deg, #6366f1, #8b5cf6, #6366f1);
             background-size: 200% 100%;
             border-radius: 12px;
-            animation: loading 2s ease-in-out infinite;
+            animation: loading 15s ease-in-out infinite;
         }
 
         @keyframes loading {
@@ -187,30 +167,6 @@
             80%, 100% { content: '...'; }
         }
 
-        .retry-info {
-            font-size: 0.8125rem;
-            color: #64748b;
-            margin-top: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .retry-info::before {
-            content: '';
-            width: 6px;
-            height: 6px;
-            background: #64748b;
-            border-radius: 50%;
-            animation: blink 2s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
-        }
-
         @media (max-width: 640px) {
             .container {
                 padding: 2.5rem 1.5rem;
@@ -229,7 +185,9 @@
 <body>
     <div class="container">
         <div class="icon-container">
-            <div class="icon"></div>
+            <div class="icon">
+                <i class="fas fa-sync-alt"></i>
+            </div>
         </div>
         
         <div class="status-badge">ACTUALIZANDO</div>
@@ -247,14 +205,6 @@
         <p class="message">
             Por favor, espera un momento<span class="dots"></span>
         </p>
-        
-        <p class="retry-info">
-            Actualización automática en 30 segundos
-        </p>
     </div>
-
-    <script>
-        setTimeout(() => window.location.reload(), 30000);
-    </script>
 </body>
 </html>

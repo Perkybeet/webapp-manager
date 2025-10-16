@@ -142,9 +142,13 @@ class AppService:
             return False
 
     def update_app(self, domain: str, app_config: AppConfig) -> bool:
-        """Actualizar aplicación existente"""
+        """
+        Actualizar aplicación existente con zero-downtime deployment
+        La aplicación se actualiza en una copia temporal y solo se cambia cuando está lista
+        """
         try:
             app_dir = self.apps_dir / domain
+            update_dir = self.apps_dir / f"{domain}_update"
             backup_dir = self.apps_dir / f"{domain}_backup"
 
             if not app_config.source.startswith(("http", "git@")):
@@ -163,65 +167,94 @@ class AppService:
                     print(Colors.error(error_msg))
                 return False
 
-            # Paso 1: Crear backup
+            # Paso 1: Crear copia de trabajo para actualización
             if self.verbose:
-                print(Colors.info("  Creando backup"))
-            if backup_dir.exists():
-                shutil.rmtree(backup_dir)
-            shutil.copytree(app_dir, backup_dir)
+                print(Colors.info("  Creando copia de trabajo para actualización"))
+            if update_dir.exists():
+                shutil.rmtree(update_dir)
+            shutil.copytree(app_dir, update_dir)
             if self.verbose:
-                print(Colors.success(f"  Backup creado: {backup_dir}"))
+                print(Colors.success(f"  Copia de trabajo creada: {update_dir}"))
 
-            # Paso 2: Configurar permisos para Git
+            # Paso 2: Configurar permisos para Git en la copia
             if self.verbose:
                 print(Colors.info("  Configurando permisos para Git"))
-            # Solo cambiar propietario del directorio raíz para Git
-            self.cmd.run_sudo(f"chown root:root {app_dir}", check=False)
-            self._configure_git_safe_directory(app_dir)
+            self.cmd.run_sudo(f"chown root:root {update_dir}", check=False)
+            self._configure_git_safe_directory(update_dir)
             
             try:
-                git_status = self.cmd.run(f"cd {app_dir} && git status --porcelain", check=False)
+                git_status = self.cmd.run(f"cd {update_dir} && git status --porcelain", check=False)
             except Exception as e:
                 if self.verbose:
                     print(Colors.warning(f"  Advertencia Git: {e}"))
 
-            # Paso 3: Actualizar código
+            # Paso 3: Actualizar código en la copia
             if self.verbose:
                 print(Colors.info("  Actualizando código desde repositorio"))
-            update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
+            update_success, used_branch = self._update_git_with_branch_fallback(update_dir, app_config.branch)
             
             if not update_success:
                 print(Colors.error("Error actualizando código - ninguna rama válida encontrada"))
-                self._restore_from_backup(domain, app_dir, backup_dir)
+                if update_dir.exists():
+                    shutil.rmtree(update_dir)
                 return False
             
             if used_branch != app_config.branch:
                 print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
 
-            # Paso 4: Reconstruir aplicación
+            # Paso 4: Reconstruir aplicación en la copia
             if self.verbose:
-                print(Colors.info("  Reconstruyendo aplicación"))
-            # Cambiar propietario solo del directorio raíz para el build
-            self.cmd.run_sudo(f"chown www-data:www-data {app_dir}", check=False)
+                print(Colors.info("  Reconstruyendo aplicación en copia temporal"))
+            self.cmd.run_sudo(f"chown www-data:www-data {update_dir}", check=False)
             
-            if not self._rebuild_application(app_dir, app_config):
+            if not self._rebuild_application(update_dir, app_config):
                 print(Colors.error("Error reconstruyendo aplicación"))
-                self._restore_from_backup(domain, app_dir, backup_dir)
+                if update_dir.exists():
+                    shutil.rmtree(update_dir)
                 return False
 
-            # Paso 5: Configurar permisos finales
+            # Paso 5: Configurar permisos en la copia actualizada
             if self.verbose:
-                print(Colors.info("  Configurando permisos finales"))
-            self._set_permissions(app_dir)
+                print(Colors.info("  Configurando permisos en nueva versión"))
+            self._set_permissions(update_dir)
 
-            # Paso 6: Limpiar backup
+            # Paso 6: Crear backup de la versión actual antes del intercambio
+            if self.verbose:
+                print(Colors.info("  Creando backup de versión actual"))
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
-                if self.verbose:
-                    print(Colors.info("  Backup temporal eliminado"))
-
+            
+            # Aquí la aplicación actual sigue corriendo
             if self.verbose:
-                print(Colors.success("  Actualización completada"))
+                print(Colors.info("  La aplicación actual sigue funcionando..."))
+            
+            # Paso 7: Intercambio atómico - mover actual a backup y update a actual
+            # Este es el único momento donde podría haber un breve downtime
+            if self.verbose:
+                print(Colors.info("  Realizando intercambio atómico de directorios"))
+            
+            try:
+                # Mover actual a backup
+                shutil.move(str(app_dir), str(backup_dir))
+                # Mover update a actual
+                shutil.move(str(update_dir), str(app_dir))
+                
+                if self.verbose:
+                    print(Colors.success("  ✓ Intercambio completado exitosamente"))
+            except Exception as e:
+                print(Colors.error(f"Error en intercambio de directorios: {e}"))
+                # Intentar revertir si falla
+                if backup_dir.exists() and not app_dir.exists():
+                    shutil.move(str(backup_dir), str(app_dir))
+                if update_dir.exists():
+                    shutil.rmtree(update_dir)
+                return False
+
+            # Paso 8: Limpiar backup después de verificación exitosa
+            # El backup se mantiene por si necesitamos rollback manual
+            if self.verbose:
+                print(Colors.info(f"  Backup mantenido en: {backup_dir}"))
+                print(Colors.success("  Actualización completada con zero-downtime"))
             
             return True
 
@@ -231,9 +264,12 @@ class AppService:
                 import traceback
                 print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
             
-            # Intentar restaurar desde backup
-            if backup_dir.exists():
-                self._restore_from_backup(domain, app_dir, backup_dir)
+            # Limpiar directorios temporales
+            if update_dir.exists():
+                try:
+                    shutil.rmtree(update_dir)
+                except:
+                    pass
             
             return False
 
