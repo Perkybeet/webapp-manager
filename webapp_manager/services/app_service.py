@@ -1050,7 +1050,10 @@ class AppService:
         """Actualizar dependencias directamente en la carpeta de la aplicación"""
         try:
             if app_config.app_type in ["nextjs", "nodejs"]:
-                print(Colors.info("📦 Actualizando dependencias npm..."))
+                if self.progress:
+                    self.progress.log("Actualizando dependencias npm...")
+                elif self.verbose:
+                    print(Colors.info("📦 Actualizando dependencias npm..."))
                 
                 # Usar npm install para actualizar dependencias
                 install_result = self.cmd.run(
@@ -1059,29 +1062,45 @@ class AppService:
                 )
                 
                 if not install_result:
-                    print(Colors.error("❌ Error actualizando dependencias npm"))
+                    msg = "Error actualizando dependencias npm"
+                    if self.progress:
+                        self.progress.error(msg)
+                    else:
+                        print(Colors.error(f"❌ {msg}"))
                     return False
                 
                 node_modules = app_dir / "node_modules"
                 if not node_modules.exists():
-                    print(Colors.error("❌ node_modules no existe"))
+                    msg = "node_modules no existe"
+                    if self.progress:
+                        self.progress.error(msg)
+                    else:
+                        print(Colors.error(f"❌ {msg}"))
                     return False
                 
                 if self.verbose:
                     print(Colors.success("  ✓ Dependencias npm actualizadas"))
                 
             elif app_config.app_type == "fastapi":
-                print(Colors.info("🐍 Actualizando dependencias Python..."))
+                if self.progress:
+                    self.progress.log("Actualizando dependencias Python...")
+                elif self.verbose:
+                    print(Colors.info("🐍 Actualizando dependencias Python..."))
                 
                 venv_dir = app_dir / ".venv"
                 requirements_file = app_dir / "requirements.txt"
                 
                 # Si no existe venv, crearlo
                 if not venv_dir.exists():
-                    print(Colors.info("  Creando entorno virtual..."))
+                    if self.verbose:
+                        print(Colors.info("  Creando entorno virtual..."))
                     venv_result = self.cmd.run(f"cd {app_dir} && python3 -m venv .venv", check=False)
                     if not venv_result:
-                        print(Colors.error("❌ Error creando entorno virtual"))
+                        msg = "Error creando entorno virtual"
+                        if self.progress:
+                            self.progress.error(msg)
+                        else:
+                            print(Colors.error(f"❌ {msg}"))
                         return False
                 
                 # Actualizar pip
@@ -1094,7 +1113,11 @@ class AppService:
                         check=False,
                     )
                     if not install_deps:
-                        print(Colors.error("❌ Error actualizando dependencias de Python"))
+                        msg = "Error actualizando dependencias de Python"
+                        if self.progress:
+                            self.progress.error(msg)
+                        else:
+                            print(Colors.error(f"❌ {msg}"))
                         return False
                 else:
                     install_basic = self.cmd.run(
@@ -1102,7 +1125,11 @@ class AppService:
                         check=False,
                     )
                     if not install_basic:
-                        print(Colors.error("❌ Error instalando dependencias básicas"))
+                        msg = "Error instalando dependencias básicas"
+                        if self.progress:
+                            self.progress.error(msg)
+                        else:
+                            print(Colors.error(f"❌ {msg}"))
                         return False
                 
                 if self.verbose:
@@ -1111,7 +1138,11 @@ class AppService:
             return True
             
         except Exception as e:
-            print(Colors.error(f"❌ Error actualizando dependencias: {e}"))
+            msg = f"Error actualizando dependencias: {e}"
+            if self.progress:
+                self.progress.error(msg)
+            else:
+                print(Colors.error(f"❌ {msg}"))
             return False
 
     def _has_prisma(self, app_dir: Path) -> bool:
@@ -1149,12 +1180,16 @@ class AppService:
     def _run_prisma_generate(self, app_dir: Path, app_config: AppConfig) -> bool:
         """Ejecutar prisma generate"""
         try:
-            print(Colors.info("🔄 Ejecutando prisma generate..."))
+            if self.progress:
+                self.progress.log("Ejecutando prisma generate...")
+            elif self.verbose:
+                print(Colors.info("🔄 Ejecutando prisma generate..."))
             
             # Verificar que node_modules existe
             node_modules = app_dir / "node_modules"
             if not node_modules.exists():
-                print(Colors.warning("node_modules no encontrado, instalando dependencias primero..."))
+                if self.verbose:
+                    print(Colors.warning("node_modules no encontrado, instalando dependencias primero..."))
                 install_result = self.cmd.run(
                     f"cd {app_dir} && npm install",
                     check=False
@@ -1169,7 +1204,11 @@ class AppService:
             )
             
             if not prisma_result:
-                print(Colors.error("❌ Error ejecutando prisma generate"))
+                msg = "Error ejecutando prisma generate"
+                if self.progress:
+                    self.progress.error(msg)
+                else:
+                    print(Colors.error(f"❌ {msg}"))
                 return False
             
             if self.verbose:
@@ -1178,14 +1217,21 @@ class AppService:
             return True
             
         except Exception as e:
-            print(Colors.error(f"❌ Error ejecutando prisma generate: {e}"))
+            msg = f"Error ejecutando prisma generate: {e}"
+            if self.progress:
+                self.progress.error(msg)
+            else:
+                print(Colors.error(f"❌ {msg}"))
             return False
 
     def _build_in_place(self, app_dir: Path, app_config: AppConfig) -> bool:
         """Construir aplicación directamente en su carpeta"""
         try:
             if app_config.app_type == "nextjs":
-                print(Colors.info("🔨 Construyendo aplicación Next.js..."))
+                if self.progress:
+                    self.progress.log("Construyendo aplicación Next.js...")
+                elif self.verbose:
+                    print(Colors.info("🔨 Construyendo aplicación Next.js..."))
                 
                 # Limpiar .next si existe
                 next_cache = app_dir / ".next"
@@ -1207,12 +1253,20 @@ class AppService:
                 )
                 
                 if not build_result:
-                    print(Colors.error("❌ Error construyendo Next.js"))
+                    msg = "Error construyendo Next.js"
+                    if self.progress:
+                        self.progress.error(msg)
+                    else:
+                        print(Colors.error(f"❌ {msg}"))
                     return False
                 
                 # Verificar que .next se creó
                 if not next_cache.exists():
-                    print(Colors.error("❌ Build no generó directorio .next"))
+                    msg = "Build no generó directorio .next"
+                    if self.progress:
+                        self.progress.error(msg)
+                    else:
+                        print(Colors.error(f"❌ {msg}"))
                     return False
                 
                 if self.verbose:
@@ -1228,13 +1282,21 @@ class AppService:
                         
                         scripts = package_data.get("scripts", {})
                         if "build" in scripts:
-                            print(Colors.info("🔨 Ejecutando build script..."))
+                            if self.progress:
+                                self.progress.log("Ejecutando build script...")
+                            elif self.verbose:
+                                print(Colors.info("🔨 Ejecutando build script..."))
+                            
                             build_result = self.cmd.run(
                                 f"cd {app_dir} && npm run build",
                                 check=False
                             )
                             if not build_result:
-                                print(Colors.error("❌ Error ejecutando build"))
+                                msg = "Error ejecutando build"
+                                if self.progress:
+                                    self.progress.error(msg)
+                                else:
+                                    print(Colors.error(f"❌ {msg}"))
                                 return False
                             if self.verbose:
                                 print(Colors.success("  ✓ Build completado"))
@@ -1246,7 +1308,11 @@ class AppService:
             
             elif app_config.app_type == "fastapi":
                 # FastAPI no requiere build, solo validar
-                print(Colors.info("🐍 Validando aplicación FastAPI..."))
+                if self.progress:
+                    self.progress.log("Validando aplicación FastAPI...")
+                elif self.verbose:
+                    print(Colors.info("🐍 Validando aplicación FastAPI..."))
+                
                 main_file = app_dir / "main.py"
                 if main_file.exists():
                     syntax_check = self.cmd.run(
@@ -1254,7 +1320,11 @@ class AppService:
                         check=False
                     )
                     if not syntax_check:
-                        print(Colors.error("❌ Error de sintaxis en main.py"))
+                        msg = "Error de sintaxis en main.py"
+                        if self.progress:
+                            self.progress.error(msg)
+                        else:
+                            print(Colors.error(f"❌ {msg}"))
                         return False
                     if self.verbose:
                         print(Colors.success("  ✓ Validación completada"))
@@ -1262,7 +1332,11 @@ class AppService:
             return True
             
         except Exception as e:
-            print(Colors.error(f"❌ Error construyendo aplicación: {e}"))
+            msg = f"Error construyendo aplicación: {e}"
+            if self.progress:
+                self.progress.error(msg)
+            else:
+                print(Colors.error(f"❌ {msg}"))
             return False
 
     def _configure_git_safe_directory(self, directory: Path):

@@ -1,5 +1,6 @@
 """
 Gestor de progreso para mostrar barras de progreso con información real
+Estilo similar a las barras de progreso de Linux (apt, yum, etc.)
 """
 
 import time
@@ -8,12 +9,9 @@ from contextlib import contextmanager
 from rich.console import Console
 from rich.progress import (
     Progress,
-    SpinnerColumn,
     TextColumn,
     BarColumn,
     TaskProgressColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn
 )
 from rich.live import Live
 from rich.panel import Panel
@@ -21,7 +19,7 @@ from rich.text import Text
 
 
 class ProgressManager:
-    """Gestor centralizado de progreso con Rich"""
+    """Gestor centralizado de progreso con Rich - Estilo Linux"""
     
     def __init__(self, console: Console, verbose: bool = False):
         self.console = console
@@ -35,15 +33,22 @@ class ProgressManager:
     def start(self):
         """Iniciar el sistema de progreso"""
         if not self.verbose:
-            # En modo no verbose, usar Live display con barra de progreso
+            # Barra de progreso estilo Linux (apt/yum)
+            # Formato: Progress: [ 57%] [####################....................]
             self.progress = Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(bar_width=60),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
+                TextColumn("{task.description}:", justify="left"),
+                TextColumn("["),
+                TaskProgressColumn(text_format="{task.percentage:>3.0f}%"),
+                TextColumn("]"),
+                BarColumn(
+                    bar_width=70,
+                    style="white",
+                    complete_style="cyan",
+                    finished_style="green",
+                    pulse_style="yellow"
+                ),
                 console=self.console,
-                expand=True
+                expand=False
             )
             self.live = Live(self.progress, console=self.console, refresh_per_second=10)
             self.live.start()

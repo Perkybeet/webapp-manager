@@ -63,7 +63,7 @@ class WebAppManager:
         # Inicializar sistema
         self._ensure_directories()
         self._create_maintenance_page()
-        self._check_prerequisites()
+        # No verificar prerequisitos automáticamente - solo cuando se solicite explícitamente
         
         # Cargar configuración
         self.config = self.config_manager.load_config()
@@ -399,9 +399,6 @@ class WebAppManager:
         env_vars: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Agregar nueva aplicación con progreso real"""
-        # Verificar prerrequisitos visiblemente para comandos de despliegue
-        self.check_prerequisites()
-        
         if self.verbose:
             print(Colors.header(f"Agregando Aplicación: {domain}"))
 
@@ -775,9 +772,6 @@ class WebAppManager:
         Actualizar aplicación con zero-downtime deployment
         El servicio se mantiene activo hasta que la nueva versión está completamente lista
         """
-        # Verificar prerrequisitos
-        self.check_prerequisites()
-        
         if self.verbose:
             print(Colors.header(f"Actualizando Aplicación: {domain}"))
 

@@ -241,7 +241,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "logs", "ssl", "diagnose", "repair", "status",
                 "export", "import", "types", "detect", "fix-config",
                 "apply-maintenance", "maintenance", "updating", "sync-pages",
-                "setup", "version", "gui"
+                "setup", "check-system", "version", "gui"
             ],
             help="Comando a ejecutar"
         )
@@ -327,6 +327,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
   webapp-manager export --file backup-config.json
   webapp-manager ssl --domain app.ejemplo.com --email admin@ejemplo.com
   webapp-manager apply-maintenance   # Aplicar páginas de mantenimiento a apps existentes
+  webapp-manager check-system        # Verificar prerequisitos del sistema
 
 [bold]🛠️  Modo Mantenimiento y Actualización:[/bold]
   # Modo interactivo (pregunta si activar/desactivar)
@@ -391,6 +392,7 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 "updating": "Modo Actualización",
                 "sync-pages": "Sincronizar Páginas",
                 "setup": "Configuración Inicial",
+                "check-system": "Verificar Prerequisitos del Sistema",
                 "version": "Información de Versión",
                 "gui": "Interfaz Gráfica"
             }
@@ -442,6 +444,8 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
             return self._cmd_sync_pages(args)
         elif command == "setup":
             return self._cmd_setup(args)
+        elif command == "check-system":
+            return self._cmd_check_system(args)
         elif command == "version":
             self._cmd_version()
             return True
@@ -1204,6 +1208,26 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
                 
         except Exception as e:
             self._show_error(f"Error durante la configuración inicial: {str(e)}")
+            return False
+    
+    def _cmd_check_system(self, args) -> bool:
+        """Verificar prerequisitos del sistema"""
+        try:
+            self.console.print(Panel(
+                "[bold cyan]Verificación de Prerequisitos del Sistema[/bold cyan]\n\n"
+                "Verificando la instalación de herramientas requeridas...",
+                title="🔍 Check System",
+                style="blue"
+            ))
+            
+            # Ejecutar verificación
+            self.manager.check_prerequisites()
+            
+            self._show_success("Verificación de sistema completada")
+            return True
+            
+        except Exception as e:
+            self._show_error(f"Error verificando prerequisitos: {str(e)}")
             return False
     
     def _cmd_version(self):
