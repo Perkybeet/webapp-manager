@@ -788,32 +788,71 @@ class WebAppManager:
         try:
             app_config = self.config_manager.get_app(domain)
 
-            # Verificar configuración
-            self.logger.step("Verificando configuración", 1, 4)
-            self.nginx_service.update_config_with_maintenance(app_config)
-            
-            # Construir nueva versión
-            self.logger.step("Construyendo nueva versión", 2, 4)
-            if not self.app_service.update_app(domain, app_config):
-                self.logger.error("Error construyendo nueva versión")
-                return False
+            # Usar progress manager si está disponible
+            if self.progress:
+                with self.progress.task("Actualizando aplicación", total=4) as task_id:
+                    # Paso 1: Verificar configuración
+                    self.progress.update(task_id, advance=0, description="[1/4] Verificando configuración")
+                    self.logger.substep("Activando modo mantenimiento")
+                    self.nginx_service.update_config_with_maintenance(app_config)
+                    self.progress.update(task_id, advance=1)
+                    
+                    # Paso 2: Construir nueva versión
+                    self.progress.update(task_id, advance=0, description="[2/4] Construyendo nueva versión")
+                    if not self.app_service.update_app(domain, app_config):
+                        self.logger.error("Error construyendo nueva versión")
+                        return False
+                    self.progress.update(task_id, advance=1)
 
-            # Reiniciar servicio
-            self.logger.step("Reiniciando servicio", 3, 4)
-            self.systemd_service.stop_service(domain)
-            success = self.systemd_service.start_and_verify(domain, app_config.port)
-            
-            # Finalizar
-            self.logger.step("Finalizando actualización", 4, 4)
-            if success:
-                self.nginx_service.disable_maintenance_mode(app_config)
-                app_config.update_timestamp()
-                self.config_manager.update_app(domain, app_config)
-                self.logger.success(f"Aplicación {domain} actualizada exitosamente")
+                    # Paso 3: Reiniciar servicio
+                    self.progress.update(task_id, advance=0, description="[3/4] Reiniciando servicio")
+                    self.logger.substep("Deteniendo servicio")
+                    self.systemd_service.stop_service(domain)
+                    self.logger.substep("Iniciando servicio")
+                    success = self.systemd_service.start_and_verify(domain, app_config.port)
+                    self.progress.update(task_id, advance=1)
+                    
+                    # Paso 4: Finalizar
+                    self.progress.update(task_id, advance=0, description="[4/4] Finalizando actualización")
+                    if success:
+                        self.logger.substep("Desactivando modo mantenimiento")
+                        self.nginx_service.disable_maintenance_mode(app_config)
+                        app_config.update_timestamp()
+                        self.config_manager.update_app(domain, app_config)
+                        self.logger.success(f"Aplicación {domain} actualizada exitosamente")
+                    else:
+                        self.logger.error("Error verificando aplicación")
+                    self.progress.update(task_id, advance=1)
+
+                    return success
             else:
-                self.logger.error("Error verificando aplicación")
+                # Modo sin progress manager (verbose o fallback)
+                # Verificar configuración
+                self.logger.step("Verificando configuración", 1, 4)
+                self.nginx_service.update_config_with_maintenance(app_config)
+                
+                # Construir nueva versión
+                self.logger.step("Construyendo nueva versión", 2, 4)
+                if not self.app_service.update_app(domain, app_config):
+                    self.logger.error("Error construyendo nueva versión")
+                    return False
 
-            return success
+                # Reiniciar servicio
+                self.logger.step("Reiniciando servicio", 3, 4)
+                self.systemd_service.stop_service(domain)
+                success = self.systemd_service.start_and_verify(domain, app_config.port)
+                
+                # Finalizar
+                self.logger.step("Finalizando actualización", 4, 4)
+                if success:
+                    self.nginx_service.disable_maintenance_mode(app_config)
+                    app_config.update_timestamp()
+                    self.config_manager.update_app(domain, app_config)
+                    self.logger.success(f"Aplicación {domain} actualizada exitosamente")
+                else:
+                    self.logger.error("Error verificando aplicación")
+
+                return success
 
         except Exception as e:
             self.logger.error(f"Error actualizando {domain}: {e}")
