@@ -169,17 +169,35 @@ class SystemdService:
             )
 
             if recent_logs:
-                success_indicators = ["Ready in", "server started", "listening on", "Started", "✓"]
-                error_indicators = ["Error:", "ERROR", "Failed", "Exception", "Cannot"]
+                # Indicadores de éxito fuerte (Next.js, Express, FastAPI, etc.)
+                strong_success_indicators = [
+                    "Ready in",           # Next.js
+                    "✓ Ready",           # Next.js
+                    "server started",    # Express
+                    "listening on",      # General
+                    "Application startup complete",  # FastAPI
+                    "Uvicorn running",   # FastAPI
+                ]
+                
+                # Indicadores de error crítico
+                critical_error_indicators = [
+                    "Error:",
+                    "ERROR",
+                    "Failed to",
+                    "Cannot bind",
+                    "EADDRINUSE",
+                    "fatal error",
+                ]
 
-                has_success = any(indicator in recent_logs for indicator in success_indicators)
-                has_errors = any(indicator in recent_logs for indicator in error_indicators)
+                # Si hay indicadores de éxito fuerte, el servicio está funcionando
+                has_strong_success = any(indicator in recent_logs for indicator in strong_success_indicators)
+                has_critical_errors = any(indicator in recent_logs for indicator in critical_error_indicators)
 
-                if has_success and not has_errors:
+                if has_strong_success:
                     print(Colors.success("Servicio funcionando correctamente"))
                     return True
-                elif has_errors:
-                    print(Colors.error("Servicio con errores:"))
+                elif has_critical_errors and not has_strong_success:
+                    print(Colors.error("Servicio con errores críticos:"))
                     print(recent_logs[-500:])
                     return False
 

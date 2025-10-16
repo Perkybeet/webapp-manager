@@ -38,8 +38,8 @@ class WebAppManager:
         self.verbose = verbose
         self.progress = progress_manager
         
-        # Inicializar logger estructurado
-        self.logger = Logger(verbose=verbose)
+        # Inicializar logger estructurado con progress_manager
+        self.logger = Logger(verbose=verbose, progress_manager=progress_manager)
         
         # Inicializar rutas del sistema
         self.paths = SystemPaths()

@@ -1,12 +1,13 @@
 """
 Gestor de progreso para mostrar barras de progreso con información real
 Estilo similar a las barras de progreso de Linux (apt, yum, etc.)
+Con barra de progreso ANCLADA al bottom
 """
 
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
-from rich.console import Console
+from rich.console import Console, Group, RenderableType
 from rich.progress import (
     Progress,
     TextColumn,
@@ -16,25 +17,38 @@ from rich.progress import (
 from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
+from rich.layout import Layout
+from rich.console import Group
 
 
 class ProgressManager:
-    """Gestor centralizado de progreso con Rich - Estilo Linux"""
+    """Gestor centralizado de progreso con Rich - Barra anclada al bottom"""
     
     def __init__(self, console: Console, verbose: bool = False):
         self.console = console
         self.verbose = verbose
         self.progress = None
         self.live = None
+        self.layout = None
         self.tasks: Dict[str, Any] = {}
-        self.log_buffer = []
-        self.max_log_lines = 10
+        self.log_lines: List[Text] = []
+        self.max_log_lines = 20
         
+    def _create_layout(self) -> Group:
+        """Crear layout con logs arriba y barra de progreso abajo"""
+        # Logs arriba (últimas N líneas)
+        log_content = Group(*self.log_lines[-self.max_log_lines:]) if self.log_lines else Text("")
+        
+        # Barra de progreso abajo
+        return Group(
+            log_content,
+            self.progress
+        )
+    
     def start(self):
-        """Iniciar el sistema de progreso"""
+        """Iniciar el sistema de progreso con barra anclada"""
         if not self.verbose:
             # Barra de progreso estilo Linux (apt/yum)
-            # Formato: Progress: [ 57%] [####################....................]
             self.progress = Progress(
                 TextColumn("{task.description}:", justify="left"),
                 TextColumn("["),
@@ -50,8 +64,23 @@ class ProgressManager:
                 console=self.console,
                 expand=False
             )
-            self.live = Live(self.progress, console=self.console, refresh_per_second=10)
+            
+            # Usar Live con el layout
+            self.live = Live(
+                self._create_layout(),
+                console=self.console,
+                refresh_per_second=10,
+                screen=False  # No usar pantalla completa
+            )
             self.live.start()
+    
+    def _update_display(self):
+        """Actualizar el display con el layout actualizado"""
+        if self.live and not self.verbose:
+            try:
+                self.live.update(self._create_layout())
+            except Exception:
+                pass
     
     def stop(self):
         """Detener el sistema de progreso"""
@@ -65,7 +94,7 @@ class ProgressManager:
         
         self.progress = None
         self.tasks.clear()
-        self.log_buffer.clear()
+        self.log_lines.clear()
     
     def force_cleanup(self):
         """Forzar limpieza del progreso en caso de error"""
@@ -89,7 +118,7 @@ class ProgressManager:
             self.progress = None
             self.live = None
             self.tasks.clear()
-            self.log_buffer.clear()
+            self.log_lines.clear()
     
     @contextmanager
     def task(self, description: str, total: Optional[int] = None):
@@ -143,6 +172,7 @@ class ProgressManager:
                 if description:
                     update_kwargs["description"] = description
                 self.progress.update(task_id, **update_kwargs)
+                self._update_display()
     
     def log(self, message: str, style: str = "dim"):
         """Agregar un log que se muestra según el modo"""
@@ -150,22 +180,42 @@ class ProgressManager:
             # En modo verbose, mostrar inmediatamente
             self.console.print(f"[{style}]{message}[/{style}]")
         else:
-            # En modo no verbose, agregar al buffer
-            self.log_buffer.append((message, style))
-            if len(self.log_buffer) > self.max_log_lines:
-                self.log_buffer.pop(0)
+            # En modo no verbose, agregar a las líneas de log
+            self.log_lines.append(Text(message, style=style))
+            # Mantener solo las últimas N líneas
+            if len(self.log_lines) > self.max_log_lines:
+                self.log_lines.pop(0)
+            self._update_display()
     
     def error(self, message: str):
         """Mostrar mensaje de error (siempre visible)"""
-        self.console.print(f"[bold red]❌ {message}[/bold red]")
+        if self.verbose:
+            self.console.print(f"[bold red]❌ {message}[/bold red]")
+        else:
+            self.log_lines.append(Text(f"❌ {message}", style="bold red"))
+            if len(self.log_lines) > self.max_log_lines:
+                self.log_lines.pop(0)
+            self._update_display()
     
     def warning(self, message: str):
         """Mostrar mensaje de advertencia (siempre visible)"""
-        self.console.print(f"[bold yellow]⚠️  {message}[/bold yellow]")
+        if self.verbose:
+            self.console.print(f"[bold yellow]⚠️  {message}[/bold yellow]")
+        else:
+            self.log_lines.append(Text(f"⚠️  {message}", style="bold yellow"))
+            if len(self.log_lines) > self.max_log_lines:
+                self.log_lines.pop(0)
+            self._update_display()
     
     def success(self, message: str):
         """Mostrar mensaje de éxito (siempre visible)"""
-        self.console.print(f"[bold green]✅ {message}[/bold green]")
+        if self.verbose:
+            self.console.print(f"[bold green]✅ {message}[/bold green]")
+        else:
+            self.log_lines.append(Text(f"✅ {message}", style="bold green"))
+            if len(self.log_lines) > self.max_log_lines:
+                self.log_lines.pop(0)
+            self._update_display()
     
     def info(self, message: str):
         """Mostrar mensaje informativo según el modo"""

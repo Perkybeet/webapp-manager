@@ -35,19 +35,21 @@ class Logger:
         LogLevel.CRITICAL: {"icon": "🔥", "style": "bold white on red", "prefix": "CRITICAL"},
     }
     
-    def __init__(self, verbose: bool = False, quiet: bool = False):
+    def __init__(self, verbose: bool = False, quiet: bool = False, progress_manager=None):
         """
         Inicializar logger
         
         Args:
             verbose: Mostrar logs detallados (DEBUG level)
             quiet: Mostrar solo errores y críticos
+            progress_manager: Progress manager para integración con barras de progreso
         """
         self.console = Console()
         self.verbose = verbose
         self.quiet = quiet
         self.indent_level = 0
         self.operation_start_time = None
+        self.progress_manager = progress_manager
         
     def _should_log(self, level: LogLevel) -> bool:
         """Determinar si se debe mostrar el log según el nivel"""
@@ -77,10 +79,22 @@ class Logger:
         config = self.LEVEL_CONFIG[level]
         formatted_msg = self._format_message(message, level)
         
-        if self.verbose:
-            self.console.print(f"[{config['style']}]{formatted_msg}[/{config['style']}]")
+        # Si hay progress_manager y no estamos en verbose, usar su sistema de logs
+        if self.progress_manager and not self.verbose:
+            if level in [LogLevel.ERROR, LogLevel.CRITICAL]:
+                self.progress_manager.error(message)
+            elif level == LogLevel.WARNING:
+                self.progress_manager.warning(message)
+            elif level == LogLevel.SUCCESS:
+                self.progress_manager.success(message)
+            else:
+                self.progress_manager.log(message, "dim" if level == LogLevel.DEBUG else "white")
         else:
-            self.console.print(f"[{config['style']}]{config['icon']} {formatted_msg}[/{config['style']}]")
+            # Fallback a impresión normal
+            if self.verbose:
+                self.console.print(f"[{config['style']}]{formatted_msg}[/{config['style']}]")
+            else:
+                self.console.print(f"[{config['style']}]{config['icon']} {formatted_msg}[/{config['style']}]")
     
     def debug(self, message: str):
         """Log de debug"""
@@ -129,8 +143,16 @@ class Logger:
         if not self._should_log(LogLevel.INFO):
             return
         
-        indent = "  " * (self.indent_level + 1)
-        self.console.print(f"[cyan]{indent}→[/cyan] {message}")
+        # Si hay progress_manager y no estamos en verbose, usar su sistema de logs
+        if self.progress_manager and not self.verbose:
+            # Agregar el substep como un log en el progress manager
+            self.progress_manager.log_lines.append(Text(f"  → {message}", style="cyan"))
+            if len(self.progress_manager.log_lines) > self.progress_manager.max_log_lines:
+                self.progress_manager.log_lines.pop(0)
+            self.progress_manager._update_display()
+        else:
+            indent = "  " * (self.indent_level + 1)
+            self.console.print(f"[cyan]{indent}→[/cyan] {message}")
     
     def command(self, command: str, show: bool = None):
         """
