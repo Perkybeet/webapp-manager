@@ -34,16 +34,21 @@ class ProgressManager:
         self.log_lines: List[Text] = []
         self.max_log_lines = 20
         
-    def _create_layout(self) -> Group:
+    def _create_layout(self):
         """Crear layout con logs arriba y barra de progreso abajo"""
-        # Logs arriba (últimas N líneas)
-        log_content = Group(*self.log_lines[-self.max_log_lines:]) if self.log_lines else Text("")
+        # Crear lista de renderables
+        renderables = []
         
-        # Barra de progreso abajo
-        return Group(
-            log_content,
-            self.progress
-        )
+        # Agregar logs (últimas N líneas)
+        if self.log_lines:
+            for log_line in self.log_lines[-self.max_log_lines:]:
+                renderables.append(log_line)
+        
+        # Agregar barra de progreso al final
+        if self.progress:
+            renderables.append(self.progress)
+        
+        return Group(*renderables) if renderables else Text("")
     
     def start(self):
         """Iniciar el sistema de progreso con barra anclada"""
@@ -62,25 +67,33 @@ class ProgressManager:
                     pulse_style="yellow"
                 ),
                 console=self.console,
-                expand=False
+                expand=False,
+                auto_refresh=True,
+                refresh_per_second=20  # Refrescar más frecuentemente
             )
             
-            # Usar Live con el layout
+            # Usar Live con el layout - auto_refresh para actualizaciones automáticas
             self.live = Live(
                 self._create_layout(),
                 console=self.console,
-                refresh_per_second=10,
-                screen=False  # No usar pantalla completa
+                refresh_per_second=20,
+                screen=False,  # No usar pantalla completa
+                auto_refresh=True  # Actualizar automáticamente
             )
             self.live.start()
     
     def _update_display(self):
         """Actualizar el display con el layout actualizado"""
-        if self.live and not self.verbose:
+        if self.live and not self.verbose and self.progress:
             try:
-                self.live.update(self._create_layout())
-            except Exception:
-                pass
+                # Actualizar el contenido del Live
+                self.live.update(self._create_layout(), refresh=True)
+                # Forzar refresh inmediato
+                self.live.refresh()
+            except Exception as e:
+                # Si falla, intentar reiniciar el live
+                if self.verbose:
+                    self.console.print(f"[dim]Error actualizando display: {e}[/dim]")
     
     def stop(self):
         """Detener el sistema de progreso"""
@@ -172,7 +185,10 @@ class ProgressManager:
                 if description:
                     update_kwargs["description"] = description
                 self.progress.update(task_id, **update_kwargs)
+                # Forzar actualización del display
                 self._update_display()
+                # Pequeña pausa para que Rich procese
+                time.sleep(0.01)
     
     def log(self, message: str, style: str = "dim"):
         """Agregar un log que se muestra según el modo"""
