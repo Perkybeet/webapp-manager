@@ -710,17 +710,38 @@ Para ayuda detallada: [bold]webapp-manager --help[/bold]
         return result
     
     def _cmd_update(self, args) -> bool:
-        """Comando update"""
+        """Comando update con logging mejorado"""
         if not args.domain:
             self._show_error("Necesitas especificar --domain")
             return False
         
+        # Mostrar encabezado
+        self.console.print()
+        self.console.print(Panel(
+            f"[bold white]Actualizando: {args.domain}[/bold white]\n"
+            f"[dim]Se actualizará el código y reconstruirá la aplicación[/dim]",
+            title="🔄 Actualización de Aplicación",
+            border_style="cyan",
+            padding=(1, 2)
+        ))
+        self.console.print()
+        
         result = self.manager.update_app(args.domain)
         
         if result:
-            self._show_success(f"Aplicación {args.domain} actualizada exitosamente")
+            self.console.print()
+            self.console.print(Panel(
+                f"[bold green]✅ Aplicación {args.domain} actualizada exitosamente[/bold green]",
+                border_style="green",
+                padding=(0, 2)
+            ))
         else:
-            self._show_error(f"Error actualizando {args.domain}")
+            self.console.print()
+            self.console.print(Panel(
+                f"[bold red]❌ Error actualizando {args.domain}[/bold red]",
+                border_style="red",
+                padding=(0, 2)
+            ))
         
         return result
     

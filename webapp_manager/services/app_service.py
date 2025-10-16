@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from ..utils import CommandRunner, Colors, Validators
+from ..utils import CommandRunner, Colors, Validators, Logger
 from ..models import AppConfig
 from .cmd_service import CmdService
 
@@ -16,9 +16,10 @@ from .cmd_service import CmdService
 class AppService:
     """Servicio para gestión de aplicaciones"""
     
-    def __init__(self, apps_dir: Path, verbose: bool = False, progress_manager=None):
+    def __init__(self, apps_dir: Path, verbose: bool = False, progress_manager=None, logger: Logger = None):
         self.apps_dir = apps_dir
-        self.cmd = CmdService(verbose=verbose)
+        self.logger = logger or Logger(verbose=verbose)
+        self.cmd = CmdService(verbose=verbose, logger=self.logger)
         self.verbose = verbose
         self.progress = progress_manager
     
@@ -150,111 +151,80 @@ class AppService:
             app_dir = self.apps_dir / domain
             backup_dir = self.apps_dir / f"{domain}_backup"
 
+            # Validación inicial
             if not app_config.source.startswith(("http", "git@")):
-                error_msg = "Solo se pueden actualizar aplicaciones desde repositorios git"
-                if self.progress:
-                    self.progress.error(error_msg)
-                else:
-                    print(Colors.error(error_msg))
+                self.logger.error("Solo se pueden actualizar aplicaciones desde repositorios git")
                 return False
 
             if not app_dir.exists():
-                error_msg = f"Directorio de aplicación no existe: {app_dir}"
-                if self.progress:
-                    self.progress.error(error_msg)
-                else:
-                    print(Colors.error(error_msg))
+                self.logger.error(f"Directorio de aplicación no existe: {app_dir}")
                 return False
 
             # Paso 1: Crear backup de seguridad
-            if self.verbose:
-                print(Colors.info("  Creando backup de seguridad"))
+            self.logger.substep("Creando backup de seguridad")
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
             
-            # Backup completo para poder revertir si algo sale mal
             shutil.copytree(app_dir, backup_dir)
-            if self.verbose:
-                print(Colors.success(f"  Backup creado en: {backup_dir}"))
+            self.logger.success(f"Backup creado: {backup_dir.name}")
 
             # Paso 2: Configurar permisos para Git
-            if self.verbose:
-                print(Colors.info("  Configurando permisos para Git"))
-            self.cmd.run_sudo(f"chown root:root {app_dir}", check=False)
+            self.logger.substep("Configurando Git")
+            self.cmd.run_sudo(f"chown root:root {app_dir}", check=False, show_command=False)
             self._configure_git_safe_directory(app_dir)
 
-            # Paso 3: Actualizar código directamente con git pull
-            if self.verbose:
-                print(Colors.info("  Actualizando código desde repositorio (git pull)"))
+            # Paso 3: Actualizar código desde repositorio
+            self.logger.substep("Actualizando código desde repositorio")
             
             update_success, used_branch = self._update_git_with_branch_fallback(app_dir, app_config.branch)
             
             if not update_success:
-                print(Colors.error("Error actualizando código - ninguna rama válida encontrada"))
-                # Revertir desde backup
-                if backup_dir.exists():
-                    shutil.rmtree(app_dir)
-                    shutil.copytree(backup_dir, app_dir)
-                    print(Colors.info("Aplicación revertida desde backup"))
+                self.logger.error("No se pudo actualizar el código")
+                self._revert_from_backup(app_dir, backup_dir)
                 return False
             
             if used_branch != app_config.branch:
-                print(Colors.warning(f"Nota: Se usó la rama '{used_branch}' en lugar de '{app_config.branch}'"))
+                self.logger.warning(f"Se usó la rama '{used_branch}' (configurada: '{app_config.branch}')")
 
-            # Paso 4: Cambiar propietario a www-data para instalar dependencias
-            self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}", check=False)
+            # Paso 4: Cambiar propietario a www-data
+            self.cmd.run_sudo(f"chown -R www-data:www-data {app_dir}", check=False, show_command=False)
 
-            # Paso 5: Instalar/actualizar dependencias
-            if self.verbose:
-                print(Colors.info("  Instalando/actualizando dependencias"))
+            # Paso 5: Actualizar dependencias
+            self.logger.substep("Actualizando dependencias")
             
             if not self._update_dependencies_in_place(app_dir, app_config):
-                print(Colors.error("Error actualizando dependencias"))
-                # Revertir desde backup
-                if backup_dir.exists():
-                    shutil.rmtree(app_dir)
-                    shutil.copytree(backup_dir, app_dir)
-                    print(Colors.info("Aplicación revertida desde backup"))
+                self.logger.error("Error actualizando dependencias")
+                self._revert_from_backup(app_dir, backup_dir)
                 return False
 
-            # Paso 6: Detectar y ejecutar Prisma Generate si es necesario
+            # Paso 6: Prisma generate (si aplica)
             if self._has_prisma(app_dir):
-                if self.verbose:
-                    print(Colors.info("  Prisma detectado, ejecutando prisma generate"))
+                self.logger.substep("Ejecutando prisma generate")
                 if not self._run_prisma_generate(app_dir, app_config):
-                    print(Colors.warning("Error ejecutando prisma generate, continuando..."))
+                    self.logger.warning("Error con prisma generate, continuando...")
 
-            # Paso 7: Hacer build en la misma carpeta
-            if self.verbose:
-                print(Colors.info("  Construyendo aplicación"))
+            # Paso 7: Construir aplicación
+            self.logger.substep("Construyendo aplicación")
             
             if not self._build_in_place(app_dir, app_config):
-                print(Colors.error("Error construyendo aplicación"))
-                # Revertir desde backup
-                if backup_dir.exists():
-                    shutil.rmtree(app_dir)
-                    shutil.copytree(backup_dir, app_dir)
-                    print(Colors.info("Aplicación revertida desde backup"))
+                self.logger.error("Error en la construcción")
+                self._revert_from_backup(app_dir, backup_dir)
                 return False
 
             # Paso 8: Configurar permisos finales
-            if self.verbose:
-                print(Colors.info("  Configurando permisos finales"))
+            self.logger.substep("Configurando permisos")
             self._set_permissions(app_dir)
 
-            # Paso 9: Limpiar backup si todo salió bien
+            # Paso 9: Limpiar backup
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
-                if self.verbose:
-                    print(Colors.info("  Backup temporal eliminado"))
 
-            if self.verbose:
-                print(Colors.success("  ✓ Actualización completada exitosamente"))
+            self.logger.success("Actualización completada exitosamente")
             
             return True
 
         except Exception as e:
-            print(Colors.error(f"Error durante actualización: {e}"))
+            self.logger.error(f"Error durante actualización: {e}")
             if self.verbose:
                 import traceback
                 print(Colors.error(f"Detalles:\n{traceback.format_exc()}"))
@@ -361,56 +331,50 @@ class AppService:
         Returns:
             tuple[bool, str]: (éxito, rama_usada)
         """
-        # Lista de ramas a intentar en orden de preferencia
+        # Lista de ramas a intentar
         branches_to_try = [preferred_branch]
         
-        # Añadir ramas comunes si no están ya en la lista
+        # Añadir ramas comunes
         common_branches = ["main", "master", "develop", "dev"]
         for branch in common_branches:
             if branch not in branches_to_try:
                 branches_to_try.append(branch)
         
-        if self.verbose:
-            print(Colors.info(f"🌿 Ramas a intentar para actualización: {', '.join(branches_to_try)}"))
+        self.logger.debug(f"Ramas a intentar: {', '.join(branches_to_try)}")
         
-        # Primero hacer fetch general
+        # Fetch
         try:
             fetch_result = self.cmd.run(f"cd {app_dir} && git fetch origin")
-            if self.verbose:
-                print(Colors.success("✅ Git fetch completado"))
+            self.logger.debug("Git fetch completado")
         except Exception as e:
-            if self.verbose:
-                print(Colors.error(f"❌ Error haciendo git fetch: {e}"))
+            self.logger.error(f"Error en git fetch: {e}")
             return False, ""
         
         # Intentar con cada rama
         for branch in branches_to_try:
-            if self.verbose:
-                print(Colors.info(f"🔄 Intentando actualizar con rama: {branch}"))
+            self.logger.debug(f"Intentando rama: {branch}")
             
             try:
                 # Verificar si la rama existe en el remoto
                 check_result = self.cmd.run(
                     f"cd {app_dir} && git ls-remote --heads origin {branch}",
-                    check=False
+                    check=False,
+                    show_command=False
                 )
                 
                 if not check_result:
-                    if self.verbose:
-                        print(Colors.warning(f"⚠️  Rama '{branch}' no existe en el remoto"))
+                    self.logger.debug(f"Rama '{branch}' no existe")
                     continue
                 
-                # Intentar hacer reset hard a esa rama
+                # Reset hard a esa rama
                 reset_result = self.cmd.run(f"cd {app_dir} && git reset --hard origin/{branch}")
                 
                 if reset_result is not None:
-                    if self.verbose:
-                        print(Colors.success(f"✅ Actualización exitosa con rama: {branch}"))
+                    self.logger.debug(f"Actualizado con rama: {branch}")
                     return True, branch
                     
             except Exception as e:
-                if self.verbose:
-                    print(Colors.warning(f"⚠️  Error con rama '{branch}': {e}"))
+                self.logger.debug(f"Error con rama '{branch}': {e}")
                 continue
         
         return False, ""
@@ -419,80 +383,53 @@ class AppService:
         """Obtener código fuente"""
         try:
             if source.startswith(("http", "git@")):
-                if self.verbose:
-                    print(Colors.info(f"🔄 Clonando repositorio: {source}"))
-                    print(Colors.info(f"🌿 Rama preferida: {branch}"))
-                    print(Colors.info(f"📁 Destino: {target_dir}"))
-                else:
-                    print(Colors.info(f"Clonando repositorio: {source}"))
+                self.logger.debug(f"Clonando desde: {source}")
+                self.logger.debug(f"Rama: {branch}")
                 
-                # Intentar clonar primero con SSH si es una URL SSH
+                # Intentar clonar
                 clone_success = False
                 used_branch = branch
                 
                 if source.startswith("git@"):
-                    # Para URLs SSH, intentar primero con SSH
-                    if self.verbose:
-                        print(Colors.info("🔑 Intentando clonado SSH..."))
-                    
+                    # Intentar SSH
                     clone_success, used_branch = self._try_clone_with_branch_fallback(source, target_dir, branch)
                     
                     if not clone_success:
-                        # Convertir SSH a HTTPS y reintentar
+                        # Convertir SSH a HTTPS
                         if "github.com" in source:
                             https_url = source.replace("git@github.com:", "https://github.com/")
-                            if self.verbose:
-                                print(Colors.warning("🔄 SSH falló, intentando con HTTPS..."))
-                                print(Colors.info(f"🌐 URL HTTPS: {https_url}"))
-                            
+                            self.logger.debug("Reintentando con HTTPS...")
                             clone_success, used_branch = self._try_clone_with_branch_fallback(https_url, target_dir, branch)
                 
                 else:
-                    # Para URLs HTTPS
-                    if self.verbose:
-                        print(Colors.info("🌐 Clonando via HTTPS..."))
-                    
+                    # HTTPS directo
                     clone_success, used_branch = self._try_clone_with_branch_fallback(source, target_dir, branch)
                 
                 if not clone_success:
-                    print(Colors.error(f"❌ Error clonando repositorio: {source}"))
-                    if self.verbose:
-                        print(Colors.error("💡 Posibles causas:"))
-                        print(Colors.error("   • Repositorio privado sin acceso"))
-                        print(Colors.error("   • Ninguna de las ramas comunes existe (main, master, develop, dev)"))
-                        print(Colors.error("   • Problemas de red"))
-                        print(Colors.error("   • Credenciales SSH no configuradas"))
+                    self.logger.error("Error clonando repositorio")
                     return False
 
                 if target_dir.exists():
                     self._configure_git_safe_directory(target_dir)
-                    if self.verbose:
-                        if used_branch != branch:
-                            print(Colors.warning(f"⚠️  Nota: Se usó la rama '{used_branch}' en lugar de '{branch}'"))
-                        print(Colors.success("✅ Repositorio clonado exitosamente"))
+                    if used_branch != branch:
+                        self.logger.warning(f"Se usó la rama '{used_branch}' (configurada: '{branch}')")
+                    self.logger.success("Repositorio clonado exitosamente")
             else:
                 if not Path(source).exists():
-                    print(Colors.error(f"Directorio fuente no existe: {source}"))
+                    self.logger.error(f"Directorio fuente no existe: {source}")
                     return False
 
-                if self.verbose:
-                    print(Colors.info(f"📂 Copiando desde directorio local: {source}"))
-                    print(Colors.info(f"📁 Destino: {target_dir}"))
-                else:
-                    print(Colors.info(f"Copiando desde: {source}"))
-                
+                self.logger.debug(f"Copiando desde: {source}")
                 shutil.copytree(source, target_dir)
-                
-                if self.verbose:
-                    print(Colors.success("✅ Código copiado exitosamente"))
+                self.logger.success("Código copiado exitosamente")
 
             return True
 
         except Exception as e:
-            print(Colors.error(f"Error obteniendo código fuente: {e}"))
+            self.logger.error(f"Error obteniendo código fuente: {e}")
             if self.verbose:
                 import traceback
-                print(Colors.error(f"🔍 Detalles del error:\n{traceback.format_exc()}"))
+                self.logger.debug(f"Detalles:\n{traceback.format_exc()}")
             return False
 
     def _validate_app_structure(self, app_dir: Path, app_type: str) -> bool:
@@ -1001,40 +938,35 @@ class AppService:
             print(Colors.error(f"Error finalizando despliegue: {e}"))
             return False
 
+    def _revert_from_backup(self, app_dir: Path, backup_dir: Path):
+        """Revertir aplicación desde backup"""
+        try:
+            if backup_dir.exists():
+                self.logger.warning("Revirtiendo desde backup...")
+                if app_dir.exists():
+                    shutil.rmtree(app_dir)
+                shutil.copytree(backup_dir, app_dir)
+                self.logger.info("Aplicación revertida")
+        except Exception as e:
+            self.logger.error(f"Error revirtiendo backup: {e}")
+
     def _set_permissions(self, app_dir: Path):
         """Configurar permisos de directorio de forma optimizada"""
-        # Solo cambiar el propietario del directorio raíz y directorios críticos
-        # Los archivos en node_modules, .next, dist, etc. no necesitan cambios
+        # Cambiar propietario del directorio raíz
+        self.cmd.run_sudo(f"chown www-data:www-data {app_dir}", check=False, show_command=False)
         
-        if self.verbose:
-            print(Colors.info("  Configurando permisos (optimizado)..."))
-        
-        # Cambiar propietario del directorio raíz solamente
-        self.cmd.run_sudo(f"chown www-data:www-data {app_dir}", check=False)
-        
-        # Cambiar propietario solo de directorios críticos, no recursivamente en todo
-        critical_dirs = [
-            "public",
-            "static",
-            ".next",
-            "dist",
-            "build",
-            "out",
-            ".output"  # Para Nuxt/Nitro
-        ]
+        # Cambiar propietario solo de directorios críticos
+        critical_dirs = ["public", "static", ".next", "dist", "build", "out", ".output"]
         
         for dir_name in critical_dirs:
             dir_path = app_dir / dir_name
             if dir_path.exists():
-                # Solo chown en el directorio, los archivos internos ya tienen permisos correctos
-                self.cmd.run_sudo(f"chown -R www-data:www-data {dir_path}", check=False)
+                self.cmd.run_sudo(f"chown -R www-data:www-data {dir_path}", check=False, show_command=False)
         
-        # Configurar permisos de ejecución solo donde es necesario
+        # Configurar permisos de ejecución
         node_modules_bin = app_dir / "node_modules" / ".bin"
         if node_modules_bin.exists():
-            self.cmd.run_sudo(f"chmod -R +x {node_modules_bin}", check=False)
-            if self.verbose:
-                print(Colors.info("  Permisos de ejecución para node_modules/.bin/"))
+            self.cmd.run_sudo(f"chmod -R +x {node_modules_bin}", check=False, show_command=False)
         
         # Para aplicaciones Python (FastAPI)
         venv_bin = app_dir / ".venv" / "bin"
@@ -1050,99 +982,61 @@ class AppService:
         """Actualizar dependencias directamente en la carpeta de la aplicación"""
         try:
             if app_config.app_type in ["nextjs", "nodejs"]:
-                if self.progress:
-                    self.progress.log("Actualizando dependencias npm...")
-                elif self.verbose:
-                    print(Colors.info("📦 Actualizando dependencias npm..."))
-                
-                # Usar npm install para actualizar dependencias
+                # Actualizar dependencias npm
                 install_result = self.cmd.run(
-                    f"cd {app_dir} && npm install --production=false",
+                    f"cd {app_dir} && npm install --omit=dev",
                     check=False
                 )
                 
                 if not install_result:
-                    msg = "Error actualizando dependencias npm"
-                    if self.progress:
-                        self.progress.error(msg)
-                    else:
-                        print(Colors.error(f"❌ {msg}"))
+                    self.logger.error("Error instalando dependencias npm")
                     return False
                 
                 node_modules = app_dir / "node_modules"
                 if not node_modules.exists():
-                    msg = "node_modules no existe"
-                    if self.progress:
-                        self.progress.error(msg)
-                    else:
-                        print(Colors.error(f"❌ {msg}"))
+                    self.logger.error("node_modules no se creó")
                     return False
                 
-                if self.verbose:
-                    print(Colors.success("  ✓ Dependencias npm actualizadas"))
+                self.logger.success("Dependencias npm actualizadas")
                 
             elif app_config.app_type == "fastapi":
-                if self.progress:
-                    self.progress.log("Actualizando dependencias Python...")
-                elif self.verbose:
-                    print(Colors.info("🐍 Actualizando dependencias Python..."))
-                
                 venv_dir = app_dir / ".venv"
                 requirements_file = app_dir / "requirements.txt"
                 
-                # Si no existe venv, crearlo
+                # Crear venv si no existe
                 if not venv_dir.exists():
-                    if self.verbose:
-                        print(Colors.info("  Creando entorno virtual..."))
                     venv_result = self.cmd.run(f"cd {app_dir} && python3 -m venv .venv", check=False)
                     if not venv_result:
-                        msg = "Error creando entorno virtual"
-                        if self.progress:
-                            self.progress.error(msg)
-                        else:
-                            print(Colors.error(f"❌ {msg}"))
+                        self.logger.error("Error creando entorno virtual")
                         return False
                 
-                # Actualizar pip
-                self.cmd.run(f"cd {app_dir} && .venv/bin/pip install --upgrade pip", check=False)
+                # Actualizar pip silenciosamente
+                self.cmd.run(f"cd {app_dir} && .venv/bin/pip install --quiet --upgrade pip", check=False)
                 
                 # Instalar/actualizar dependencias
                 if requirements_file.exists():
                     install_deps = self.cmd.run(
-                        f"cd {app_dir} && .venv/bin/pip install -r requirements.txt",
+                        f"cd {app_dir} && .venv/bin/pip install --quiet -r requirements.txt",
                         check=False,
                     )
                     if not install_deps:
-                        msg = "Error actualizando dependencias de Python"
-                        if self.progress:
-                            self.progress.error(msg)
-                        else:
-                            print(Colors.error(f"❌ {msg}"))
+                        self.logger.error("Error instalando dependencias Python")
                         return False
                 else:
                     install_basic = self.cmd.run(
-                        f"cd {app_dir} && .venv/bin/pip install fastapi uvicorn[standard]",
+                        f"cd {app_dir} && .venv/bin/pip install --quiet fastapi uvicorn[standard]",
                         check=False,
                     )
                     if not install_basic:
-                        msg = "Error instalando dependencias básicas"
-                        if self.progress:
-                            self.progress.error(msg)
-                        else:
-                            print(Colors.error(f"❌ {msg}"))
+                        self.logger.error("Error instalando dependencias básicas")
                         return False
                 
-                if self.verbose:
-                    print(Colors.success("  ✓ Dependencias Python actualizadas"))
+                self.logger.success("Dependencias Python actualizadas")
             
             return True
             
         except Exception as e:
-            msg = f"Error actualizando dependencias: {e}"
-            if self.progress:
-                self.progress.error(msg)
-            else:
-                print(Colors.error(f"❌ {msg}"))
+            self.logger.error(f"Error actualizando dependencias: {e}")
             return False
 
     def _has_prisma(self, app_dir: Path) -> bool:
@@ -1154,8 +1048,7 @@ class AppService:
         
         for path in prisma_paths:
             if path.exists():
-                if self.verbose:
-                    print(Colors.info(f"  ✓ Prisma schema encontrado: {path}"))
+                self.logger.debug(f"Prisma schema encontrado: {path}")
                 return True
         
         # También verificar en package.json
@@ -1228,10 +1121,7 @@ class AppService:
         """Construir aplicación directamente en su carpeta"""
         try:
             if app_config.app_type == "nextjs":
-                if self.progress:
-                    self.progress.log("Construyendo aplicación Next.js...")
-                elif self.verbose:
-                    print(Colors.info("🔨 Construyendo aplicación Next.js..."))
+                # Construir Next.js
                 
                 # Limpiar .next si existe
                 next_cache = app_dir / ".next"
@@ -1241,7 +1131,7 @@ class AppService:
                 # Configurar permisos antes del build
                 node_modules_bin = app_dir / "node_modules" / ".bin"
                 if node_modules_bin.exists():
-                    self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False)
+                    self.cmd.run(f"chmod -R +x {node_modules_bin}", check=False, show_command=False)
                 
                 # Construir con variables de entorno
                 build_cmd = app_config.build_command or "npm run build"
@@ -1253,24 +1143,15 @@ class AppService:
                 )
                 
                 if not build_result:
-                    msg = "Error construyendo Next.js"
-                    if self.progress:
-                        self.progress.error(msg)
-                    else:
-                        print(Colors.error(f"❌ {msg}"))
+                    self.logger.error("Error construyendo Next.js")
                     return False
                 
                 # Verificar que .next se creó
                 if not next_cache.exists():
-                    msg = "Build no generó directorio .next"
-                    if self.progress:
-                        self.progress.error(msg)
-                    else:
-                        print(Colors.error(f"❌ {msg}"))
+                    self.logger.error("Build no generó directorio .next")
                     return False
                 
-                if self.verbose:
-                    print(Colors.success("  ✓ Build Next.js completado"))
+                self.logger.success("Build Next.js completado")
                 
             elif app_config.app_type == "nodejs":
                 # Node.js puede tener script de build opcional
@@ -1282,11 +1163,6 @@ class AppService:
                         
                         scripts = package_data.get("scripts", {})
                         if "build" in scripts:
-                            if self.progress:
-                                self.progress.log("Ejecutando build script...")
-                            elif self.verbose:
-                                print(Colors.info("🔨 Ejecutando build script..."))
-                            
                             build_result = self.cmd.run(
                                 f"cd {app_dir} && npm run build",
                                 check=False

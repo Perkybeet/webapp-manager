@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 from ..config import ConfigManager
 from ..models import AppConfig, GlobalConfig, SystemPaths
 from ..services import AppService, NginxService, SystemdService, CmdService
-from ..utils import Colors, CommandRunner, Validators, ProgressManager
+from ..utils import Colors, CommandRunner, Validators, ProgressManager, Logger
 
 # Configurar logging con manejo de errores
 log_dir = Path("/var/log") if os.name == "posix" else Path("./logs")
@@ -38,13 +38,21 @@ class WebAppManager:
         self.verbose = verbose
         self.progress = progress_manager
         
+        # Inicializar logger estructurado
+        self.logger = Logger(verbose=verbose)
+        
         # Inicializar rutas del sistema
         self.paths = SystemPaths()
         self._init_paths()
         
-        # Inicializar servicios con modo verbose
+        # Inicializar servicios con logger
         self.config_manager = ConfigManager(self.paths.config_file, self.paths.backup_dir)
-        self.app_service = AppService(self.paths.apps_dir, verbose=verbose, progress_manager=progress_manager)
+        self.app_service = AppService(
+            self.paths.apps_dir, 
+            verbose=verbose, 
+            progress_manager=progress_manager,
+            logger=self.logger
+        )
         self.nginx_service = NginxService(
             self.paths.nginx_sites, 
             self.paths.nginx_enabled, 
@@ -58,12 +66,11 @@ class WebAppManager:
         )
         
         # Utilidades
-        self.cmd = CmdService(verbose=verbose)
+        self.cmd = CmdService(verbose=verbose, logger=self.logger)
         
         # Inicializar sistema
         self._ensure_directories()
         self._create_maintenance_page()
-        # No verificar prerequisitos automáticamente - solo cuando se solicite explícitamente
         
         # Cargar configuración
         self.config = self.config_manager.load_config()
@@ -81,7 +88,7 @@ class WebAppManager:
         self.paths.maintenance_dir = Path(self.paths.maintenance_dir)
     
     def _ensure_directories(self):
-        """Crear directorios necesarios"""
+        """Crear directorios necesarios sin mostrar comandos"""
         dirs = [
             self.paths.apps_dir,
             self.paths.log_dir,
@@ -95,9 +102,9 @@ class WebAppManager:
             try:
                 directory.mkdir(parents=True, exist_ok=True)
                 if directory in [self.paths.apps_dir, self.paths.log_dir, self.paths.maintenance_dir]:
-                    self.cmd.run_sudo(f"chown -R www-data:www-data {directory}", check=False)
+                    self.cmd.run_sudo(f"chown -R www-data:www-data {directory}", check=False, show_command=False)
                 elif directory == Path("/var/log/nginx"):
-                    self.cmd.run_sudo(f"chown -R www-data:adm {directory}", check=False)
+                    self.cmd.run_sudo(f"chown -R www-data:adm {directory}", check=False, show_command=False)
             except Exception as e:
                 logger.error(f"Error creando directorio {directory}: {e}")
     
@@ -772,94 +779,44 @@ class WebAppManager:
         Actualizar aplicación con zero-downtime deployment
         El servicio se mantiene activo hasta que la nueva versión está completamente lista
         """
-        if self.verbose:
-            print(Colors.header(f"Actualizando Aplicación: {domain}"))
+        self.logger.header(f"Actualización: {domain}", "Zero-downtime deployment")
 
         if not self.config_manager.app_exists(domain):
-            error_msg = f"Aplicación {domain} no encontrada"
-            if self.progress:
-                self.progress.error(error_msg)
-            else:
-                print(Colors.error(error_msg))
+            self.logger.error(f"Aplicación {domain} no encontrada")
             return False
 
         try:
             app_config = self.config_manager.get_app(domain)
 
-            if self.progress:
-                with self.progress.task(f"Actualizando {domain}", total=5) as task_id:
-                    # Verificar y aplicar configuración de mantenimiento
-                    self.progress.update(task_id, advance=0.5, description="Verificando configuración")
-                    self.nginx_service.update_config_with_maintenance(app_config)
-                    
-                    # Mostrar página de actualización (pero el servicio sigue corriendo)
-                    self.progress.update(task_id, advance=0.5, description="Preparando actualización")
-                    # Nota: NO detenemos el servicio aquí, solo preparamos el entorno
-                    
-                    # Actualizar aplicación en paralelo (copia, build, etc.)
-                    self.progress.update(task_id, advance=2, description="Construyendo nueva versión")
-                    if not self.app_service.update_app(domain, app_config):
-                        self.progress.error("Error construyendo nueva versión")
-                        return False
+            # Verificar configuración
+            self.logger.step("Verificando configuración", 1, 4)
+            self.nginx_service.update_config_with_maintenance(app_config)
+            
+            # Construir nueva versión
+            self.logger.step("Construyendo nueva versión", 2, 4)
+            if not self.app_service.update_app(domain, app_config):
+                self.logger.error("Error construyendo nueva versión")
+                return False
 
-                    # Ahora sí, reiniciar el servicio con la nueva versión
-                    self.progress.update(task_id, advance=1, description="Reiniciando servicio")
-                    self.systemd_service.stop_service(domain)
-                    success = self.systemd_service.start_and_verify(domain, app_config.port)
-                    
-                    # Desactivar modo mantenimiento
-                    self.progress.update(task_id, advance=1, description="Finalizando actualización")
-                    if success:
-                        self.nginx_service.disable_maintenance_mode(app_config)
-            else:
-                # Modo verbose/legacy
-                if self.verbose:
-                    print(Colors.info("→ Verificando configuración de mantenimiento"))
-                self.nginx_service.update_config_with_maintenance(app_config)
-                
-                if self.verbose:
-                    print(Colors.info("→ Preparando actualización"))
-                    print(Colors.info("   La aplicación actual sigue funcionando..."))
-
-                if self.verbose:
-                    print(Colors.info("→ Construyendo nueva versión en paralelo"))
-                if not self.app_service.update_app(domain, app_config):
-                    print(Colors.error("Error construyendo nueva versión"))
-                    return False
-
-                if self.verbose:
-                    print(Colors.info("→ Nueva versión lista, reiniciando servicio"))
-                self.systemd_service.stop_service(domain)
-                success = self.systemd_service.start_and_verify(domain, app_config.port)
-                
-                if success:
-                    if self.verbose:
-                        print(Colors.info("→ Desactivando modo mantenimiento"))
-                    self.nginx_service.disable_maintenance_mode(app_config)
-
+            # Reiniciar servicio
+            self.logger.step("Reiniciando servicio", 3, 4)
+            self.systemd_service.stop_service(domain)
+            success = self.systemd_service.start_and_verify(domain, app_config.port)
+            
+            # Finalizar
+            self.logger.step("Finalizando actualización", 4, 4)
             if success:
+                self.nginx_service.disable_maintenance_mode(app_config)
                 app_config.update_timestamp()
                 self.config_manager.update_app(domain, app_config)
-                
-                if self.progress:
-                    self.progress.success(f"Aplicación {domain} actualizada exitosamente con zero-downtime")
-                else:
-                    print(Colors.success(f"\n✓ Aplicación {domain} actualizada exitosamente con zero-downtime"))
+                self.logger.success(f"Aplicación {domain} actualizada exitosamente")
             else:
-                error_msg = "Error verificando aplicación después de actualización"
-                if self.progress:
-                    self.progress.error(error_msg)
-                else:
-                    print(Colors.error(error_msg))
+                self.logger.error("Error verificando aplicación")
 
             return success
 
         except Exception as e:
-            error_msg = f"Error actualizando {domain}: {e}"
-            if self.progress:
-                self.progress.error(error_msg)
-            else:
-                print(Colors.error(error_msg))
+            self.logger.error(f"Error actualizando {domain}: {e}")
             
             # Intentar restaurar el servicio
             try:
