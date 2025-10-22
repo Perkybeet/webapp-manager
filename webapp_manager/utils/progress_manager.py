@@ -10,9 +10,11 @@ from contextlib import contextmanager
 from rich.console import Console, Group, RenderableType
 from rich.progress import (
     Progress,
+    SpinnerColumn,
     TextColumn,
     BarColumn,
     TaskProgressColumn,
+    TimeRemainingColumn,
 )
 from rich.live import Live
 from rich.panel import Panel
@@ -53,21 +55,15 @@ class ProgressManager:
     def start(self):
         """Iniciar el sistema de progreso con barra anclada"""
         if not self.verbose:
-            # Barra de progreso estilo Linux (apt/yum)
+            # Barra de progreso con spinner, barra visual, porcentaje y tiempo
             self.progress = Progress(
-                TextColumn("{task.description}:", justify="left"),
-                TextColumn("["),
-                TaskProgressColumn(text_format="{task.percentage:>3.0f}%"),
-                TextColumn("]"),
-                BarColumn(
-                    bar_width=70,
-                    style="white",
-                    complete_style="cyan",
-                    finished_style="green",
-                    pulse_style="yellow"
-                ),
+                SpinnerColumn(),
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(bar_width=None),
+                TaskProgressColumn(),
+                TimeRemainingColumn(),
                 console=self.console,
-                expand=False,
+                expand=True,
                 auto_refresh=True,
                 refresh_per_second=20  # Refrescar más frecuentemente
             )
